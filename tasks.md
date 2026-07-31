@@ -30,7 +30,7 @@ Build a **100% sovereign, self-hosted Multi-Agent AI system** using **Chinese op
 ## 🎯 PHASE 2: Agent 1 — "Tender Hunter" (Public Contracts Finder)
 *Goal: Automatically find, download, analyze, and score international software tenders funded by World Bank, AfDB, EBRD, IMF.*
 
-- [ ] **Task 2.1: Data Ingestion & Scraping Engine**
+- [x] **Task 2.1: Data Ingestion & Scraping Engine**
   - Build web scrapers (using Python, Playwright/Puppeteer) targeted at tender portals:
     - World Bank (DevBusiness / Projects API).
     - African Development Bank (AfDB) procurement portal.
@@ -38,12 +38,12 @@ Build a **100% sovereign, self-hosted Multi-Agent AI system** using **Chinese op
     - International Monetary Fund (IMF) & regional government portals.
   - Implement a rotating residential proxy to bypass geo-blocking/bot protection.
 
-- [ ] **Task 2.2: Document Parsing & RAG Pipeline**
+- [x] **Task 2.2: Document Parsing & RAG Pipeline**
   - Integrate **PyMuPDF** / **Unstructured** to extract text from dense tender PDFs/DOCX.
   - Implement text chunking and vector index creation using `BGE-M3` in Qdrant/Milvus.
   - Implement `BGE-Reranker-v2-m3` to fetch relevant legal/technical contract sections.
 
-- [ ] **Task 2.3: Reasoning Engine (Faveod Criteria Filter)**
+- [x] **Task 2.3: Reasoning Engine (Faveod Criteria Filter)**
   - Develop the system prompt for `DeepSeek-R1` to evaluate 4 mandatory criteria:
     1. **Source Code / IP Ownership:** Does the client retain 100% IP rights?
     2. **High Security / Quality:** Are there local hosting or strict security requirements?
@@ -51,7 +51,7 @@ Build a **100% sovereign, self-hosted Multi-Agent AI system** using **Chinese op
     4. **Green-IT:** Are there digital sobriety or eco-design requirements?
   - Add strict anti-hallucination guardrails: Output `"IP_Status": "Unspecified - Manual review required"` if similarity score is below 0.75.
 
-- [ ] **Task 2.4: Agent Output Generation**
+- [x] **Task 2.4: Agent Output Generation**
   - Output structured JSON with a calculated **Faveod Fit Score (0–100%)** and exact source document citations.
 
 ---
@@ -59,17 +59,17 @@ Build a **100% sovereign, self-hosted Multi-Agent AI system** using **Chinese op
 ## 🤝 PHASE 3: Agent 2 — "Partner Scout" (Local ESN Discovery)
 *Goal: Identify local IT services companies (ESNs/Integrators) in target countries to act as local implementation or support partners.*
 
-- [ ] **Task 3.1: Data Collection & Search Setup**
+- [x] **Task 3.1: Data Collection & Search Setup**
   - Deploy a self-hosted **SearXNG** instance (privacy-focused meta-search engine).
   - Configure automated search queries per target country (e.g., Morocco, Senegal, UAE, Saudi Arabia, Egypt) for terms like `"Software Engineering"`, `"Systems Integrator"`, `"IT Services"`.
 
-- [ ] **Task 3.2: ESN Website & Portfolio Analyzer**
+- [x] **Task 3.2: ESN Website & Portfolio Analyzer**
   - Build a web scraper to fetch "Case Studies", "References", and "Partners" pages of discovered IT companies.
   - Use `Qwen-2.5` to analyze company profiles:
     - Identify client references and project scale.
     - Detect technology focus (Custom development vs. proprietary low-code/SAP/Oracle resellers).
 
-- [ ] **Task 3.3: Partner Qualification & Database Engine**
+- [x] **Task 3.3: Partner Qualification & Database Engine**
   - Filter out direct competitors (exclusive low-code/off-the-shelf software resellers).
   - Retain IT service providers capable of custom software maintenance and local support.
   - Format output into a structured profile: Company Name, Country, Size, Client References, Contact URL, and Faveod Affinity Score.

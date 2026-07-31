@@ -9,6 +9,15 @@ services:
       - qdrant_data:/qdrant/storage
     restart: unless-stopped
 
+  searxng:
+    image: searxng/searxng:latest
+    container_name: faveod-searxng
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./docker/searxng/settings.yml:/etc/searxng/settings.yml:ro
+    restart: unless-stopped
+
   tender-hunter:
     build: .
     container_name: faveod-tender-hunter
@@ -21,7 +30,22 @@ services:
       - ./.env:/app/.env:ro
     depends_on:
       - qdrant
-    command: ["run"]
+    command: ["-m", "tender_hunter", "run"]
+    restart: unless-stopped
+
+  partner-scout:
+    build: .
+    container_name: faveod-partner-scout
+    profiles: ["app"]
+    env_file: .env
+    environment:
+      SEARXNG_URL: http://searxng:8080
+    volumes:
+      - ./data:/app/data
+      - ./.env:/app/.env:ro
+    depends_on:
+      - searxng
+    command: ["-m", "partner_scout", "run", "--source", "searxng"]
     restart: unless-stopped
 
 volumes:

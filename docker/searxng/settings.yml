@@ -1,0 +1,16 @@
+# Minimal self-hosted SearXNG settings for the Faveod Partner Scout.
+# Enables the JSON API used by partner_scout/search/searxng.py.
+use_default_settings: true
+
+server:
+  # Dev secret; override in production.
+  secret_key: "faveod_searxng_dev"
+  limiter: false
+  public_instance: true
+
+search:
+  formats:
+    - html
+    - json
+  safe_search: 0
+  autocomplete: ""

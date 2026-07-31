@@ -9,5 +9,6 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY tender_hunter ./tender_hunter
+COPY partner_scout ./partner_scout
 
-ENTRYPOINT ["python", "-m", "tender_hunter"]
+ENTRYPOINT ["python"]
