@@ -1,0 +1,64 @@
+"""Central configuration, loaded from environment / .env."""
+
+import os
+
+from dotenv import load_dotenv
+
+load_dotenv()
+
+
+def _env(name: str, default: str = "") -> str:
+    return os.getenv(name, default)
+
+
+# --- Reasoning engine ---
+OPENROUTER_API_KEY = _env("OPENROUTER_API_KEY")
+LLM_MODEL = _env("LLM_MODEL", "deepseek/deepseek-r1:free")
+LLM_BASE_URL = _env("LLM_BASE_URL", "https://openrouter.ai/api/v1")
+LLM_TEMPERATURE = float(_env("LLM_TEMPERATURE", "0.1"))
+LLM_TIMEOUT = int(_env("LLM_TIMEOUT", "90"))
+MAX_LLM_RETRIES = int(_env("MAX_LLM_RETRIES", "2"))
+
+# --- Embeddings ---
+GEMINI_API_KEY = _env("GEMINI_API_KEY")
+EMBEDDING_PROVIDER = _env("EMBEDDING_PROVIDER", "gemini").strip().lower()
+GEMINI_EMBED_MODEL = _env("GEMINI_EMBED_MODEL", "gemini-embedding-001")
+GEMINI_EMBED_URL = _env(
+    "GEMINI_EMBED_URL",
+    "https://generativelanguage.googleapis.com/v1beta",
+)
+VECTOR_SIZE = int(_env("VECTOR_SIZE", "768"))
+
+# --- Vector store ---
+QDRANT_URL = _env("QDRANT_URL")
+QDRANT_API_KEY = _env("QDRANT_API_KEY")
+QDRANT_COLLECTION = _env("QDRANT_COLLECTION", "tender_chunks")
+
+# --- Guardrails ---
+SIMILARITY_THRESHOLD = float(_env("SIMILARITY_THRESHOLD", "0.75"))
+TOP_K = int(_env("TOP_K", "6"))
+
+# --- Chunking ---
+CHUNK_SIZE = int(_env("CHUNK_SIZE", "900"))
+CHUNK_OVERLAP = int(_env("CHUNK_OVERLAP", "120"))
+
+# --- Scraping ---
+SOURCES = [s.strip() for s in _env("SOURCES", "sample").split(",") if s.strip()]
+PROXY_LIST = [p.strip() for p in _env("PROXY_LIST", "").split(",") if p.strip()]
+HTTP_TIMEOUT = int(_env("HTTP_TIMEOUT", "30"))
+MAX_PER_SOURCE = int(_env("MAX_PER_SOURCE", "50"))
+USER_AGENT = _env(
+    "USER_AGENT",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+    "(KHTML, like Gecko) Chrome/120.0 Safari/537.36",
+)
+
+# --- Data locations ---
+DATA_DIR = _env("DATA_DIR", "data")
+SAMPLE_DOCS_DIR = os.path.join(DATA_DIR, "sample_docs")
+DOWNLOAD_DIR = os.path.join(DATA_DIR, "downloads")
+OUTPUT_DIR = os.path.join(DATA_DIR, "output")
+LOG_DIR = os.path.join(DATA_DIR, "logs")
+
+for _d in (DATA_DIR, SAMPLE_DOCS_DIR, DOWNLOAD_DIR, OUTPUT_DIR, LOG_DIR):
+    os.makedirs(_d, exist_ok=True)

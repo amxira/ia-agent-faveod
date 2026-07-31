@@ -1,1 +1,11 @@
-/.env
+# Docker / venv
+.venv/
+__pycache__/
+*.pyc
+.DS_Store
+
+# Secrets
+.env
+
+# Generated data
+data/
