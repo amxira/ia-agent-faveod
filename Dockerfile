@@ -11,5 +11,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY tender_hunter ./tender_hunter
 COPY partner_scout ./partner_scout
 COPY event_mapper ./event_mapper
+COPY dashboard ./dashboard
+COPY notifications ./notifications
 
 ENTRYPOINT ["python"]

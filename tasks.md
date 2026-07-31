@@ -96,14 +96,14 @@ Build a **100% sovereign, self-hosted Multi-Agent AI system** using **Chinese op
 ## 📊 PHASE 5: User Interface, Integration & Testing
 *Goal: Connect all 3 agents into a unified dashboard and push outputs to Faveod's team.*
 
-- [ ] **Task 5.1: Dashboard & Notification Workflow**
+- [x] **Task 5.1: Dashboard & Notification Workflow**
   - Build a user dashboard in **Dify** or a web UI (Streamlit/Next.js) displaying:
     - Real-time Tender Feed with match scores.
     - Directory of Qualified Local Partners.
     - Interactive IT Event Calendar with prioritized prospect lists.
   - Setup automated alerts (Slack, Teams, or Email digest) when a high-match tender (>80% score) is detected.
 
-- [ ] **Task 5.2: End-to-End Validation & Multilingual Testing**
+- [x] **Task 5.2: End-to-End Validation & Multilingual Testing**
   - Test Agent 1 against real Arabic, French, and English tender documents.
   - Validate anti-hallucination rules (verify that missing criteria are marked correctly rather than guessed).
   - Fine-tune prompt parameters (temperature, max tokens, system prompts).

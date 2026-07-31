@@ -24,7 +24,7 @@ def compute_fit_score(criteria: list[CriterionResult]) -> tuple[float, str, bool
     manual = any(c.status == GUARDRAIL for c in criteria)
 
     if not specified:
-        return 0.0, "POOR FIT", manual
+        return 0.0, f"(REVIEW) POOR FIT" if manual else "POOR FIT", manual
 
     weight_sum = sum(WEIGHTS.get(c.criterion, 0.0) for c in specified)
     if weight_sum == 0:

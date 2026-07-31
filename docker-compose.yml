@@ -61,5 +61,29 @@ services:
     command: ["-m", "event_mapper", "run", "--source", "sample"]
     restart: unless-stopped
 
+  dashboard:
+    build: .
+    container_name: faveod-dashboard
+    profiles: ["app"]
+    env_file: .env
+    ports:
+      - "8501:8501"
+    volumes:
+      - ./data:/app/data
+      - ./.env:/app/.env:ro
+    command: ["-m", "streamlit", "run", "dashboard/app.py", "--server.address", "0.0.0.0", "--server.port", "8501", "--server.headless", "true"]
+    restart: unless-stopped
+
+  notifications:
+    build: .
+    container_name: faveod-notifications
+    profiles: ["notify"]
+    env_file: .env
+    volumes:
+      - ./data:/app/data
+      - ./.env:/app/.env:ro
+    command: ["-m", "notifications", "check"]
+    restart: "no"
+
 volumes:
   qdrant_data:

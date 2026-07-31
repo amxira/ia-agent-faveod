@@ -65,6 +65,21 @@ priority bucket.
 Output: `ProspectCard` leads in `leads.jsonl` / `leads_latest.json` /
 `priority_leads.json`.
 
+### Phase 5 — Dashboard & Notifications (`dashboard/`, `notifications/`) ✅
+
+- **Dashboard** (`streamlit run dashboard/app.py`) — a single web UI with three
+  tabs: **Tender Feed** (match scores, criteria & citations), **Partner
+  Directory** (qualified local ESNs), and **Events & Leads** (event calendar +
+  prioritized prospect list with challenges/topics). Reads the agents' latest
+  output files, no database needed.
+- **Notifications** (`python -m notifications check`) — detects *new*
+  high-value tenders (≥ `TENDER_ALERT_THRESHOLD`, default 80%) and
+  high-priority leads (deduplicated via a state file) and dispatches them to
+  **Slack**, **Teams**, and/or **SMTP email** (console always prints).
+- **Multilingual validation** (`tests/test_multilingual.py`) — Agent 1 is tested
+  against real French (PDF), English (PDF) and Arabic (DOCX) sample tender
+  documents; anti-hallucination rules are verified to hold in every language.
+
 ### Shared infrastructure
 
 All three agents reuse the same modules:
@@ -109,11 +124,19 @@ event_mapper/                  # Agent 3 — Event Mapper & Lead Profiler (Phase
 ├── leads/                     # decision-maker classifier + enrichment + scoring
 └── output/                    # events.jsonl / leads.jsonl / priority_leads.json
 
-tests/                         # test_guardrails.py, test_partner_scout.py, test_event_mapper.py (pytest-free)
-data/                          # sample_docs, downloads, output, logs
+dashboard/                     # Phase 5 — Streamlit UI (tender feed / partners / events)
+├── data.py                    #   loads the agents' latest output files
+└── app.py                     #   `streamlit run dashboard/app.py`
+
+notifications/                 # Phase 5 — Slack/Teams/email alerts
+├── config.py notifier.py      #   detection (dedup via state file) + dispatch
+└── __main__.py                #   `python -m notifications check`
+
+tests/                         # test_guardrails.py, test_partner_scout.py, test_event_mapper.py, test_multilingual.py (pytest-free)
+data/                          # sample_docs, downloads, output, logs, state
 docker/searxng/settings.yml    # SearXNG config (JSON API enabled)
 Dockerfile  docker-compose.yml  requirements.txt  .env.example
-PHASE2_AGENT1_TENDER_HUNTER.md PHASE3_AGENT2_PARTNER_SCOUT.md PHASE4_AGENT3_EVENT_MAPPER.md  tasks.md
+PHASE2_AGENT1_TENDER_HUNTER.md PHASE3_AGENT2_PARTNER_SCOUT.md PHASE4_AGENT3_EVENT_MAPPER.md PHASE5_DASHBOARD_NOTIFICATIONS.md  tasks.md
 ```
 
 ---
@@ -209,7 +232,23 @@ Outputs (in `data/output/`):
 - `leads_latest.json` — last run, sorted by lead score.
 - `priority_leads.json` — only leads scoring ≥ `PRIORITY_THRESHOLD` (70).
 
-### Everything in Docker (Qdrant + SearXNG + all three agents)
+### Dashboard & Notifications (Phase 5)
+
+```powershell
+# Dashboard (open http://localhost:8501)
+.\.venv\Scripts\python.exe -m streamlit run dashboard/app.py
+
+# Notifications: detect & dispatch new high-value tenders / high-priority leads
+.\.venv\Scripts\python.exe -m notifications check
+.\.venv\Scripts\python.exe -m notifications check --dry-run   # print only
+.\.venv\Scripts\python.exe -m notifications check --reset     # re-alert after reset
+.\.venv\Scripts\python.exe -m notifications check --interval 60   # scheduled
+```
+
+Configure channels in `.env`: `NOTIFY_SLACK_WEBHOOK`, `NOTIFY_TEAMS_WEBHOOK`,
+or `NOTIFY_SMTP_HOST`/`NOTIFY_SMTP_TO` (+ credentials) for the email digest.
+
+### Everything in Docker (Qdrant + SearXNG + all three agents + dashboard)
 
 ```powershell
 docker compose --profile app up
@@ -223,13 +262,15 @@ docker compose --profile app up
 .\.venv\Scripts\python.exe tests\test_guardrails.py      # Agent 1  (6 tests)
 .\.venv\Scripts\python.exe tests\test_partner_scout.py   # Agent 2  (8 tests)
 .\.venv\Scripts\python.exe tests\test_event_mapper.py    # Agent 3  (7 tests)
+.\.venv\Scripts\python.exe tests\test_multilingual.py    # Phase 5  (6 tests, FR/EN/AR)
 ```
 
 All suites are pytest-free and assert against fakes (deterministic LLMs /
 embeddings), covering: similarity gate, verbatim evidence verification,
 hallucinated-quote suppression, invalid status, LLM-unavailable fallback, fit
 score / affinity score / lead score formulas, competitor disqualification,
-role classification, and offline end-to-end pipeline runs for each agent.
+role classification, offline end-to-end pipeline runs for each agent, and
+multilingual (French / English / Arabic) end-to-end validation.
 
 ---
 
@@ -245,6 +286,10 @@ role classification, and offline end-to-end pipeline runs for each agent.
 | `AFFINITY_THRESHOLD` | `60` | min score to appear in `qualified_partners.json` |
 | `EVENT_SOURCE` | `sample` | Agent 3 backend (`sample` \| `ten_times` \| `eventbrite` \| `luma` \| `news`) |
 | `PRIORITY_THRESHOLD` | `70` | min lead score to appear in `priority_leads.json` |
+| `TENDER_ALERT_THRESHOLD` | `80` | min tender score that fires a notification |
+| `NOTIFY_SLACK_WEBHOOK` | *(empty)* | Slack incoming webhook (alerts) |
+| `NOTIFY_TEAMS_WEBHOOK` | *(empty)* | Teams incoming webhook (alerts) |
+| `NOTIFY_SMTP_HOST`/`NOTIFY_SMTP_TO` | *(empty)* | SMTP email digest |
 | `QDRANT_URL` | *(empty)* | empty = in-memory vector store |
 
 ---
