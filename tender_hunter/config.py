@@ -13,7 +13,10 @@ def _env(name: str, default: str = "") -> str:
 
 # --- Reasoning engine ---
 OPENROUTER_API_KEY = _env("OPENROUTER_API_KEY")
-LLM_MODEL = _env("LLM_MODEL", "deepseek/deepseek-r1:free")
+# Free models on OpenRouter rotate often. The client auto-discovers a working
+# free model when the configured one becomes unavailable. Paid alternative:
+# deepseek/deepseek-r1 (or deepseek/deepseek-r1-0528).
+LLM_MODEL = _env("LLM_MODEL", "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free")
 LLM_BASE_URL = _env("LLM_BASE_URL", "https://openrouter.ai/api/v1")
 LLM_TEMPERATURE = float(_env("LLM_TEMPERATURE", "0.1"))
 LLM_TIMEOUT = int(_env("LLM_TIMEOUT", "90"))
@@ -27,6 +30,8 @@ GEMINI_EMBED_URL = _env(
     "GEMINI_EMBED_URL",
     "https://generativelanguage.googleapis.com/v1beta",
 )
+# Minimum seconds between embedding batches (free-tier RPM throttling).
+GEMINI_RATE_LIMIT_SLEEP = float(_env("GEMINI_RATE_LIMIT_SLEEP", "0.5"))
 VECTOR_SIZE = int(_env("VECTOR_SIZE", "768"))
 
 # --- Vector store ---

@@ -121,7 +121,7 @@ def test_invalid_status():
 def test_llm_unavailable():
     doc = "the client owns the code outright"
     store = _store([doc], MapEmbedder({doc: HIGH_VEC}, HIGH_VEC))
-    no_llm = LLMClient()  # no api key -> available False
+    no_llm = LLMClient(api_key="")  # explicitly no key -> available False
     engine = CriteriaEngine(no_llm, MapEmbedder({doc: HIGH_VEC}, HIGH_VEC), store, threshold=0.75, top_k=4)
     crit = engine.evaluate("T1")
     res = _status_of(crit, "ip_ownership")

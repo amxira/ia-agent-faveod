@@ -45,7 +45,7 @@ class TenderPipeline:
             except Exception as exc:  # noqa: BLE001
                 log.warning("[%s] embedding/indexing failed for %s: %s", tender.id, doc.name, exc)
 
-        criteria = self.engine.evaluate(tender.id)
+        criteria = self.engine.evaluate(tender.id, has_documents=documents_analyzed > 0)
         fit_score, grade, manual = compute_fit_score(criteria)
         summary = build_summary(criteria)
 

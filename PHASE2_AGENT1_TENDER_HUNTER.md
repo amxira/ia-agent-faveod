@@ -25,7 +25,7 @@ when you add two free API keys.
 |------|--------|-------|
 | 2.1 Data Ingestion & Scraping Engine | ✅ Done | Live scrapers for WB + EBRD; adapters for AfDB/IMF; proxy middleware; offline sample dataset |
 | 2.2 Document Parsing & RAG Pipeline | ✅ Done | PyMuPDF + python-docx extraction, page-aware chunking, Qdrant vector store, Gemini embeddings (BGE-M3 swap-in ready) |
-| 2.3 Reasoning Engine (Faveod Criteria Filter) | ✅ Done | DeepSeek-R1 prompt for the 4 criteria + 3 anti-hallucination guardrails |
+| 2.3 Reasoning Engine (Faveod Criteria Filter) | ✅ Done | Free reasoning-model prompt for the 4 criteria + 3 anti-hallucination guardrails |
 | 2.4 Agent Output Generation | ✅ Done | JSON reports with Fit Score, grades, page-level citations |
 
 ---
@@ -59,11 +59,11 @@ tender_hunter/
 ├── vectorstore/         # TASK 2.2
 │   └── store.py         #   Qdrant (server or in-memory), cosine distance
 ├── reasoning/           # TASK 2.3
-│   ├── prompts.py       #   DeepSeek-R1 system prompt + 4 criteria definitions
+│   ├── prompts.py       #   reasoning-model system prompt + 4 criteria definitions
 │   ├── engine.py        #   guardrail-driven evaluation engine
 │   └── scoring.py       #   Faveod Fit Score formula + grades
 ├── llm/
-│   └── client.py        #   OpenAI-compatible client → OpenRouter (DeepSeek-R1 free)
+│   └── client.py        #   OpenAI-compatible client → OpenRouter (free model + auto-discovery)
 ├── output/
 │   └── report.py        #   TASK 2.4 — writes JSONL + latest.json + high_value.json
 ├── Dockerfile           # container image for the agent
@@ -89,7 +89,7 @@ CLI run
                       3. chunk text with overlap (page-aware)
                       4. embed chunks            (Gemini, or local fallback)
                       5. index into Qdrant       (in-memory if no server)
-                      6. evaluate 4 criteria with guardrails  (DeepSeek-R1 via OpenRouter)
+                      6. evaluate 4 criteria with guardrails  (free model via OpenRouter)
                       7. compute Fit Score + citations
                       8. emit FaveodReport
             │
@@ -144,8 +144,11 @@ the code.
 
 ## 7. Key decisions (per your answers)
 
-- **Reasoning LLM:** OpenRouter, default model `deepseek/deepseek-r1:free`
-  (configurable). Client is OpenAI-compatible, so vLLM/Ollama endpoints work too.
+- **Reasoning LLM:** OpenRouter, default model
+  `nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free` (configurable). The client
+  is OpenAI-compatible, so vLLM/Ollama endpoints work too. On a 404 (free models
+  rotate often — `deepseek/deepseek-r1:free` was retired), the client
+  auto-discovers a working free reasoning model and switches to it.
 - **Embeddings:** Google Gemini free-tier API (`gemini-embedding-001`) via REST;
   automatic fallback to a local hashing embedder when no key is set, so RAG
   never hard-depends on a network call. BGE-M3 can replace it via the same
@@ -171,9 +174,11 @@ the code.
 
 ### 8.3 Real scoring (add 2 free API keys)
 1. Copy `.env.example` → `.env`
-2. `OPENROUTER_API_KEY=...`  (free model `deepseek/deepseek-r1:free`)
+2. `OPENROUTER_API_KEY=...`  (free model auto-discovered; set `LLM_MODEL` to override)
 3. `GEMINI_API_KEY=...`      (free tier embeddings)
-4. Re-run any `run` command → criteria are now evaluated by DeepSeek-R1.
+4. Re-run any `run` command → criteria are now evaluated by a free reasoning model.
+   With no `LLM_API_KEY`, or on API failures, the engine honestly falls back to
+   guardrail-only mode (criteria flagged manual review) instead of guessing.
 
 ### 8.4 Scheduled monitoring
 ```
@@ -255,6 +260,12 @@ and prefixes the grade with `(REVIEW)` — no guesswork is ever hidden.
 - ✅ Live EBRD ECEPP scraping verified (50 real notices with countries & closing dates).
 - ✅ Guardrail & scoring logic — 6/6 unit tests pass.
 - ✅ All 36 Python files compile cleanly.
+- ✅ End-to-end live run verified: 97 tenders (sample + WB + EBRD) ingested and
+  scored with real free-tier LLM + Gemini embeddings — no crash. Sanity checks:
+  French RFP → `100% STRONG FIT` (citations verified), off-the-shelf CRM → `0%
+  POOR FIT`, vague notice / listing-only WB & EBRD items → flagged
+  `[MANUAL REVIEW]` instead of hallucinated scores. Gemini 429 throttling and the
+  retired DeepSeek free slug are handled transparently.
 
 ---
 
@@ -265,7 +276,11 @@ and prefixes the grade with `(REVIEW)` — no guesswork is ever hidden.
 - **World Bank** yields *projects* (the free API has no direct tender-notice
   feed); notice-level data still needs a follow-up crawl of the project detail
   pages. A dedicated procurement-notices scraper can be added later.
-- **Fit Score** is only meaningful once `OPENROUTER_API_KEY` + `GEMINI_API_KEY`
-  are set; otherwise criteria are honestly held in manual-review mode.
+- **WB / EBRD listings** have no downloadable PDFs, so they are honestly held in
+  `[MANUAL REVIEW]` (0% score, `no_documents` guardrail). Only tenders with
+  analyzable documents get an LLM verdict. A document-crawler pass is the natural
+  next improvement so live tenders can be scored automatically.
+- **Gemini free tier** throttles under heavy parallel indexing (429); the embedder
+  retries with backoff and the graph degrades gracefully instead of crashing.
 - **Recommended next phases:** Phase 3 (Partner Scout), Phase 5 dashboard +
   alerts (Slack/Teams/email when a tender ≥ 80% is detected).

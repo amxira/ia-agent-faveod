@@ -47,23 +47,43 @@ class CriteriaEngine:
         self.threshold = threshold or config.SIMILARITY_THRESHOLD
         self.top_k = top_k or config.TOP_K
 
-    def evaluate(self, tender_id: str) -> list[CriterionResult]:
+    def evaluate(self, tender_id: str, has_documents: bool = True) -> list[CriterionResult]:
         results: list[CriterionResult] = []
         for criterion in CRITERIA:
+            if not has_documents:
+                results.append(self._no_documents(criterion["key"], criterion["label"]))
+                continue
             results.append(self._evaluate_one(tender_id, criterion["key"], criterion["label"], criterion["question"]))
         return results
 
-    def _evaluate_one(self, tender_id: str, key: str, label: str, question: str) -> CriterionResult:
-        query_vector = self.embedder.embed(question)
-        hits = self.store.search(tender_id, query_vector, self.top_k)
-        max_sim = max((h.score for h in hits), default=0.0)
-
-        base = CriterionResult(
+    @staticmethod
+    def _no_documents(key: str, label: str) -> CriterionResult:
+        return CriterionResult(
             criterion=key,
             label=label,
             status=GUARDRAIL,
-            similarity_score=round(max_sim, 4),
+            similarity_score=0.0,
+            guardrail="no_documents",
+            rationale=(
+                "No analyzable documents were found for this tender (listing-level "
+                "notice only). The criterion was not evaluated. Manual review required."
+            ),
         )
+
+    def _evaluate_one(self, tender_id: str, key: str, label: str, question: str) -> CriterionResult:
+        base = CriterionResult(criterion=key, label=label, status=GUARDRAIL, similarity_score=0.0)
+
+        try:
+            query_vector = self.embedder.embed(question)
+            hits = self.store.search(tender_id, query_vector, self.top_k)
+        except Exception as exc:  # noqa: BLE001 - retrieval must never crash the graph
+            base.guardrail = "embedding_unavailable"
+            base.rationale = f"Retrieval failed ({exc.__class__.__name__}); manual review required."
+            log.warning("[%s] retrieval failed for %s: %s", tender_id, key, exc)
+            return base
+
+        max_sim = max((h.score for h in hits), default=0.0)
+        base.similarity_score = round(max_sim, 4)
 
         if not hits or max_sim < self.threshold:
             base.guardrail = "similarity_below_threshold" if hits else "no_relevant_document"
