@@ -25,17 +25,19 @@ def _format_result(result) -> str:
 
     if "reports" in result and "agent" in result:
         return (
-            f"Agent lancé : {result['agent']} ({result.get('duration_s')} s) - "
-            f"{result.get('reports')} rapport(s), {result.get('high_value')} à forte valeur."
+            f"**Agent {result['agent']} exécuté** en {result.get('duration_s')} s : "
+            f"{result.get('reports')} rapport(s), {result.get('high_value')} à forte valeur "
+            f"(sources : {result.get('sources')})."
         )
     if "partners" in result and "agent" in result:
         return (
-            f"Agent lancé : {result['agent']} ({result.get('duration_s')} s) - "
-            f"{result.get('partners')} entreprise(s), {result.get('qualified')} qualifiée(s)."
+            f"**Agent {result['agent']} exécuté** en {result.get('duration_s')} s : "
+            f"{result.get('partners')} entreprise(s), {result.get('qualified')} qualifiée(s) "
+            f"(source : {result.get('source')})."
         )
     if "events" in result and "agent" in result:
         return (
-            f"Agent lancé : {result['agent']} ({result.get('duration_s')} s) - "
+            f"**Agent {result['agent']} exécuté** en {result.get('duration_s')} s : "
             f"{result.get('events')} événement(s), {result.get('leads')} lead(s), "
             f"{result.get('priority_leads')} haute priorité."
         )
@@ -43,20 +45,66 @@ def _format_result(result) -> str:
         items = result.get("items", [])
         if not items:
             return "Aucun résultat trouvé pour cette recherche."
-        lines = []
-        for item in items[:8]:
-            lines.append(_format_item(item))
-        extra = f"\n(+{len(items) - 8} autres...)" if len(items) > 8 else ""
-        return f"{result.get('count', len(items))} résultat(s) :\n" + "\n".join(lines) + extra
+        return _format_items_table(items, result.get("count", len(items)), grouped=bool(result.get("grouped")))
     if "tenders" in result or "leads" in result or "qualified_partners" in result:
         return _format_summary(result)
     if "already_saved" in result:
         if result.get("already_saved"):
-            return f"Déjà dans les favoris ({result.get('item_id')})."
-        return f"Enregistré dans les favoris : {result.get('item_id')}."
+            return f"Déjà dans les favoris : `{result.get('item_id')}`."
+        return f"Enregistré dans les favoris : `{result.get('item_id')}`."
     if result.get("ok") is False:
         return f"Erreur : {result.get('reason', 'inconnue')}"
     return str(result)
+
+
+def _format_items_table(items: list[dict], count: int, grouped: bool = False) -> str:
+    """Render search results as a markdown table."""
+    if grouped:
+        lines = [f"**Meilleur par pays ({count} pays) :**", ""]
+    else:
+        lines = [f"**{count} résultat(s) :**", ""]
+    first = items[0]
+
+    if "tender_id" in first:
+        lines.append("| ID | Titre | Pays | Score | Note | Deadline |")
+        lines.append("|---|---|---|---|---|---|")
+        for item in items[:8]:
+            lines.append(
+                f"| `{item.get('tender_id')}` | {item.get('title')} | {item.get('country')} | "
+                f"{item.get('fit_score')}% | {item.get('fit_grade')} | {item.get('deadline')} |"
+            )
+    elif "partner_id" in first:
+        lines.append("| ID | Entreprise | Pays | Affinité | Note | Qualifié |")
+        lines.append("|---|---|---|---|---|---|")
+        for item in items[:8]:
+            lines.append(
+                f"| `{item.get('partner_id')}` | {item.get('company_name')} | {item.get('country')} | "
+                f"{item.get('affinity_score')}% | {item.get('affinity_grade')} | "
+                f"{'✅' if item.get('qualified') else '❌'} |"
+            )
+    elif "lead_id" in first:
+        lines.append("| ID | Personne | Poste | Entreprise | Pays | Score | Priorité |")
+        lines.append("|---|---|---|---|---|---|---|")
+        for item in items[:8]:
+            lines.append(
+                f"| `{item.get('lead_id')}` | {item.get('person_name')} | {item.get('job_title')} | "
+                f"{item.get('company')} | {item.get('country')} | {item.get('lead_score')}% | "
+                f"{item.get('priority')} |"
+            )
+    elif "id" in first and "name" in first:
+        lines.append("| ID | Événement | Ville | Pays | Début | Leads |")
+        lines.append("|---|---|---|---|---|---|")
+        for item in items[:8]:
+            lines.append(
+                f"| `{item.get('id')}` | {item.get('name')} | {item.get('city')} | {item.get('country')} | "
+                f"{item.get('start_date')} | {item.get('lead_count', 0)} |"
+            )
+    else:
+        return str(items[:8])
+
+    if count > 8:
+        lines.append(f"\n_(+{count - 8} autres)_")
+    return "\n".join(lines)
 
 
 def _format_item(item: dict) -> str:
@@ -83,15 +131,15 @@ def _format_item(item: dict) -> str:
 
 def _format_summary(data: dict) -> str:
     return (
-        "État des agents (derniers résultats) :\n"
-        f"- Appels d'offres : {data.get('tenders', 0)} analysés, "
-        f"{data.get('high_value_tenders', 0)} à forte valeur\n"
-        f"- Partenaires : {data.get('partners', 0)} découverts, "
-        f"{data.get('qualified_partners', 0)} qualifiés\n"
-        f"- Événements : {data.get('events', 0)}\n"
-        f"- Leads : {data.get('leads', 0)}, "
-        f"{data.get('priority_leads', 0)} haute priorité\n"
-        f"- Favoris : {data.get('saved', {})}"
+        "**État des agents (derniers résultats) :**\n\n"
+        f"- Appels d'offres : **{data.get('tenders', 0)}** analysés, "
+        f"**{data.get('high_value_tenders', 0)}** à forte valeur\n"
+        f"- Partenaires : **{data.get('partners', 0)}** découverts, "
+        f"**{data.get('qualified_partners', 0)}** qualifiés\n"
+        f"- Événements : **{data.get('events', 0)}**\n"
+        f"- Leads : **{data.get('leads', 0)}**, "
+        f"**{data.get('priority_leads', 0)}** haute priorité\n"
+        f"- Favoris : `{data.get('saved', {})}`"
     )
 
 
@@ -105,8 +153,19 @@ def _detect_agent(text: str) -> str:
     return "tender_hunter"
 
 
+_PER_COUNTRY_HINTS = (
+    "par pays", "chaque pays", "pour chaque pays", "tous les pays",
+    "per country", "each country", "for each country", "all countries",
+)
+
+
+def _wants_per_country(text: str) -> bool:
+    return any(hint in text for hint in _PER_COUNTRY_HINTS)
+
+
 def local_answer(message: str, transcript: list | None = None) -> str:
     text = message.lower()
+    per_country = _wants_per_country(text)
 
     if any(w in text for w in ("run", "lancer", "lance", "scanner", "scan", "scrape", "collecte", "refresh", "maj", "mise à jour", "actualise")):
         agent = _detect_agent(text)
@@ -120,10 +179,12 @@ def local_answer(message: str, transcript: list | None = None) -> str:
         return _answer("dashboard_summary")
 
     if any(w in text for w in ("partenaire", "partners", "partner")):
-        return _answer("search_partners", {})
+        return _answer("search_partners", {"per_country": per_country})
     if any(w in text for w in ("lead", "leads", "prospect")):
-        return _answer("search_leads", {})
+        return _answer("search_leads", {"per_country": per_country})
+    if any(w in text for w in ("event", "events", "événement", "evenement", "conférence", "conference", "summit")):
+        return _answer("search_events", {"per_country": per_country})
     if any(w in text for w in ("tender", "appel", "appels", "offre", "offres")):
-        return _answer("search_tenders", {})
+        return _answer("search_tenders", {"per_country": per_country})
 
     return _answer("help")

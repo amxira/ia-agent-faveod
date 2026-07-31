@@ -28,7 +28,9 @@ class ChatAssistant:
     """Stateful assistant: keeps the conversation and executes tools."""
 
     def __init__(self, llm: LLMClient | None = None):
-        self.llm = llm or LLMClient()
+        # Fast-fail for the chat: one attempt, then the local fallback takes
+        # over instead of making the user wait through long retry loops.
+        self.llm = llm or LLMClient(timeout=30, max_retries=1)
         self.history: list[dict] = []
 
     @property

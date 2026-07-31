@@ -15,6 +15,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")
 
 from chat.assistant import ChatAssistant
 from chat.fallback import _detect_agent, local_answer
+from chat.tools import _run_without_logs, tool_search_events, tool_search_tenders
 from tender_hunter.llm.client import LLMClient
 
 
@@ -96,10 +97,46 @@ def test_messages_render_only_visible():
     print("ok test_messages_render_only_visible")
 
 
+def test_events_search_and_intent():
+    result = tool_search_events(limit=10)
+    assert "items" in result and "count" in result
+    reply = local_answer("donne moi le meilleur events")
+    assert "résultat" in reply or "Aucun" in reply
+    assert "Événement" in reply or "événement" in reply or "Aucun" in reply
+    print("ok test_events_search_and_intent")
+
+
+def test_run_tool_strips_log():
+    res = _run_without_logs(lambda: {"log": "secret-log", "ok": True})
+    assert res == {"ok": True}, res
+    print("ok test_run_tool_strips_log")
+
+
+def test_per_country_grouping():
+    result = tool_search_events(per_country=True, limit=20)
+    assert result.get("grouped") is True
+    countries = [i.get("country") for i in result["items"]]
+    assert len(countries) == len(set(countries)), "one event per country expected"
+    assert result["count"] >= 1
+    assert "Meilleur par pays" in local_answer("donne moi le meilleur event pour chaque pays")
+    print("ok test_per_country_grouping")
+
+
+def test_meta_words_do_not_filter():
+    result = tool_search_events(query="best", limit=10)
+    assert result["count"] >= 1, "query 'best' must not filter events out"
+    assert tool_search_tenders(query="top tenders", limit=10)["count"] >= 0
+    print("ok test_meta_words_do_not_filter")
+
+
 if __name__ == "__main__":
     test_tool_loop()
     test_bad_arguments_handled()
     test_llm_unavailable_fallback()
     test_local_answer_intents()
     test_messages_render_only_visible()
+    test_events_search_and_intent()
+    test_run_tool_strips_log()
+    test_per_country_grouping()
+    test_meta_words_do_not_filter()
     print("\nALL CHAT TESTS PASSED")

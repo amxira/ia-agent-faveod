@@ -36,6 +36,17 @@ def _id(item: dict, kind: str) -> str:
     return str(item.get(keys[kind]) or "")
 
 
+def _render_run_result(results: dict, agent: str) -> None:
+    """Show the JSON result + captured execution log of an agent run."""
+    result = results.get(agent)
+    if not result:
+        return
+    st.json({k: v for k, v in result.items() if k != "log"})
+    log_text = result.get("log") or ""
+    with st.expander("📋 Journal d'exécution"):
+        st.code(log_text if log_text else "(aucun log capturé)", language="text")
+
+
 def _label(item: dict, kind: str) -> str:
     if kind == "tenders":
         return f"{item.get('tender_id')} · {item.get('title')} [{item.get('fit_score')}%]"
@@ -107,8 +118,7 @@ def render_control() -> None:
                     res = {"ok": False, "error": str(exc)}
                 results["tender_hunter"] = res
             st.rerun()
-        if "tender_hunter" in results:
-            st.json(results["tender_hunter"])
+        _render_run_result(results, "tender_hunter")
 
     with st.expander("🤝 Agent 2 - Partner Scout", expanded=True):
         p1, p2 = st.columns(2)
@@ -127,8 +137,7 @@ def render_control() -> None:
                     res = {"ok": False, "error": str(exc)}
                 results["partner_scout"] = res
             st.rerun()
-        if "partner_scout" in results:
-            st.json(results["partner_scout"])
+        _render_run_result(results, "partner_scout")
 
     with st.expander("📅 Agent 3 - Event Mapper & Lead Profiler", expanded=True):
         e1, e2 = st.columns(2)
@@ -143,8 +152,7 @@ def render_control() -> None:
                     res = {"ok": False, "error": str(exc)}
                 results["event_mapper"] = res
             st.rerun()
-        if "event_mapper" in results:
-            st.json(results["event_mapper"])
+        _render_run_result(results, "event_mapper")
 
     with st.expander("🔔 Notifications"):
         c1, c2 = st.columns(2)
@@ -325,24 +333,83 @@ def render_saved() -> None:
 # --------------------------------------------------------------------------- #
 # tab 6 - chat
 # --------------------------------------------------------------------------- #
+def _tool_items_df(items: list[dict]) -> pd.DataFrame:
+    first = items[0] if items else {}
+    if "tender_id" in first:
+        return pd.DataFrame([
+            {"ID": i.get("tender_id"), "Titre": i.get("title"), "Pays": i.get("country"),
+             "Score %": i.get("fit_score"), "Note": i.get("fit_grade"), "Deadline": i.get("deadline")}
+            for i in items
+        ])
+    if "partner_id" in first:
+        return pd.DataFrame([
+            {"ID": i.get("partner_id"), "Entreprise": i.get("company_name"), "Pays": i.get("country"),
+             "Affinité %": i.get("affinity_score"), "Note": i.get("affinity_grade"),
+             "Qualifié": "✅" if i.get("qualified") else "❌"}
+            for i in items
+        ])
+    if "lead_id" in first:
+        return pd.DataFrame([
+            {"ID": i.get("lead_id"), "Personne": i.get("person_name"), "Poste": i.get("job_title"),
+             "Entreprise": i.get("company"), "Pays": i.get("country"),
+             "Score %": i.get("lead_score"), "Priorité": i.get("priority")}
+            for i in items
+        ])
+    if "id" in first and "name" in first:
+        return pd.DataFrame([
+            {"ID": i.get("id"), "Événement": i.get("name"), "Ville": i.get("city"), "Pays": i.get("country"),
+             "Début": i.get("start_date"), "Leads": i.get("lead_count", 0), "Lien": i.get("url")}
+            for i in items
+        ])
+    return pd.DataFrame(items)
+
+
+def _render_tool(entry: dict) -> None:
+    name = entry.get("name", "tool")
+    try:
+        import json as _json
+        payload = _json.loads(entry.get("content") or "")
+    except Exception:  # noqa: BLE001
+        payload = {}
+    with st.expander(f"🛠 Outil exécuté : `{name}`", expanded=False):
+        items = payload.get("items") if isinstance(payload, dict) else None
+        if isinstance(items, list) and items:
+            st.dataframe(_tool_items_df(items), use_container_width=True, hide_index=True)
+            st.caption(f"{payload.get('count', len(items))} résultat(s)")
+        else:
+            st.json(payload)
+
+
 def render_chat() -> None:
     if "assistant" not in st.session_state:
         st.session_state.assistant = ChatAssistant()
     assistant = st.session_state.assistant
 
-    st.caption("Faveod Assist peut résumer l'état, chercher (avec filtres date/pays), lancer les agents et enregistrer des favoris.")
+    st.caption(
+        "Faveod Assist peut résumer l'état, chercher (tenders / partenaires / "
+        "leads / événements, avec filtres date-pays-score), lancer les 3 agents "
+        "et enregistrer des favoris."
+    )
 
-    for msg in assistant.messages:
-        with st.chat_message(msg["role"]):
-            st.write(msg["content"])
+    for entry in assistant.history:
+        role = entry.get("role")
+        content = entry.get("content") or ""
+        if role == "user":
+            with st.chat_message("user"):
+                st.markdown(content)
+        elif role == "tool":
+            _render_tool(entry)
+        elif role == "assistant":
+            with st.chat_message("assistant"):
+                st.markdown(content)
 
     if prompt := st.chat_input("Posez votre question (FR / EN / AR)...", key="chat_input"):
         with st.chat_message("user"):
-            st.write(prompt)
+            st.markdown(prompt)
         with st.chat_message("assistant"):
             with st.spinner("Faveod Assist analyse..."):
                 reply = assistant.answer(prompt)
-            st.write(reply)
+            st.markdown(reply)
         st.rerun()
 
 

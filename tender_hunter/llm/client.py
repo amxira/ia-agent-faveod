@@ -75,12 +75,13 @@ def discover_free_model() -> str | None:
 
 
 class LLMClient:
-    def __init__(self, base_url: str | None = None, api_key: str | None = None, model: str | None = None, temperature: float | None = None, timeout: int | None = None):
+    def __init__(self, base_url: str | None = None, api_key: str | None = None, model: str | None = None, temperature: float | None = None, timeout: int | None = None, max_retries: int | None = None):
         self.base_url = base_url if base_url is not None else config.LLM_BASE_URL
         self.api_key = api_key if api_key is not None else config.OPENROUTER_API_KEY
         self.model = model if model is not None else config.LLM_MODEL
         self.temperature = temperature if temperature is not None else config.LLM_TEMPERATURE
         self.timeout = timeout if timeout is not None else config.LLM_TIMEOUT
+        self.max_retries = max_retries if max_retries is not None else config.MAX_LLM_RETRIES
         self._switched_to_free = False
 
     @property
@@ -94,7 +95,7 @@ class LLMClient:
             return None
         client = OpenAI(base_url=self.base_url, api_key=self.api_key, timeout=self.timeout)
 
-        attempts = config.MAX_LLM_RETRIES + 1
+        attempts = self.max_retries + 1
         for attempt in range(attempts):
             try:
                 kwargs: dict = {

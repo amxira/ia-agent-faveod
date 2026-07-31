@@ -80,9 +80,22 @@ def test_saved_store():
     print("ok test_saved_store")
 
 
+def test_log_capture():
+    import logging
+
+    from control.runner import _LogCapture
+
+    with _LogCapture() as cap:
+        logging.getLogger("control.test").info("hello capture")
+    assert "hello capture" in cap.text
+    assert "INFO" in cap.text
+    print("ok test_log_capture")
+
+
 if __name__ == "__main__":
     test_tender_recent_filter()
     test_tender_fetch_applies_filter()
     test_event_upcoming_filter()
     test_saved_store()
+    test_log_capture()
     print("\nALL CONTROL TESTS PASSED")
