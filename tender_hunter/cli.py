@@ -37,6 +37,8 @@ def _setup_logging() -> None:
 def _run(args: argparse.Namespace) -> int:
     if args.sources:
         config.SOURCES = args.sources
+    if args.days and args.days > 0:
+        config.RECENT_DAYS = args.days
 
     if args.interval and args.interval > 0:
         while True:
@@ -80,6 +82,7 @@ def main(argv: list[str] | None = None) -> int:
 
     run_p = sub.add_parser("run", help="scrape, analyze and score tenders")
     run_p.add_argument("--sources", nargs="+", default=None, help="source names (sample, world_bank, ebrd, afdb, imf)")
+    run_p.add_argument("--days", type=int, default=0, help="keep only tenders published within the last N days (0 = all)")
     run_p.add_argument("--limit", type=int, default=0, help="max reports to emit (0 = all)")
     run_p.add_argument("--interval", type=float, default=0, help="rescan every N minutes (0 = once)")
     run_p.set_defaults(func=_run)

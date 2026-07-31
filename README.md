@@ -80,6 +80,26 @@ Output: `ProspectCard` leads in `leads.jsonl` / `leads_latest.json` /
   against real French (PDF), English (PDF) and Arabic (DOCX) sample tender
   documents; anti-hallucination rules are verified to hold in every language.
 
+### Phase 6 — Control Center, AI Assistant & Full-Button UI (`control/`, `chat/`) ✅
+
+No more CLI commands to get results:
+
+- **Button-driven Control Center** — run each agent in-process from the
+  dashboard with source / country / date / limit inputs (`control/runner.py`).
+- **Favorites** — bookmark tenders, partners and leads with one click
+  (`control/saved.py`, stored in `data/saved.json`).
+- **Date filters everywhere** — `RECENT_DAYS` keeps tenders published within
+  the last N days; `UPCOMING_DAYS` keeps events starting within the next N days.
+  Exposed in the CLIs (`--days`), the dashboard filters, and the chat agent.
+- **Faveod Assist — chat agent** (`chat/`) — a client-facing assistant built on
+  a tool-calling loop: it can summarize the state, search with filters
+  (country / score / date), run the agents, and save favorites — all in French,
+  English or Arabic. When the LLM is rate-limited or has no API key it falls
+  back to local pattern-based answers so it still works offline.
+  - Dashboard tab: **Assist** (`streamlit run dashboard/app.py`).
+  - CLI: `python -m chat "Combien de partenaires qualifiés avons-nous ?"` or
+    `python -m chat --interactive`.
+
 ### Shared infrastructure
 
 All three agents reuse the same modules:
@@ -126,17 +146,27 @@ event_mapper/                  # Agent 3 — Event Mapper & Lead Profiler (Phase
 
 dashboard/                     # Phase 5 — Streamlit UI (tender feed / partners / events)
 ├── data.py                    #   loads the agents' latest output files
-└── app.py                     #   `streamlit run dashboard/app.py`
+└── app.py                     #   Phase 6: run buttons, filters, favorites, chat tab
+
+control/                       # Phase 6 — programmatic agent runs + favorites store
+├── runner.py                  #   run_tenders / run_partners / run_events (in-process)
+└── saved.py                   #   data/saved.json bookmark store
+
+chat/                          # Phase 6 — Faveod Assist chat agent
+├── assistant.py               #   tool-calling loop over the shared LLM client
+├── tools.py                   #   search / run / save tools (with date filters)
+├── fallback.py                #   LLM-free local answers
+└── __main__.py                #   `python -m chat "question"` / --interactive
 
 notifications/                 # Phase 5 — Slack/Teams/email alerts
 ├── config.py notifier.py      #   detection (dedup via state file) + dispatch
 └── __main__.py                #   `python -m notifications check`
 
-tests/                         # test_guardrails.py, test_partner_scout.py, test_event_mapper.py, test_multilingual.py (pytest-free)
+tests/                         # test_guardrails.py, test_partner_scout.py, test_event_mapper.py, test_multilingual.py, test_control.py, test_chat.py (pytest-free)
 data/                          # sample_docs, downloads, output, logs, state
 docker/searxng/settings.yml    # SearXNG config (JSON API enabled)
 Dockerfile  docker-compose.yml  requirements.txt  .env.example
-PHASE2_AGENT1_TENDER_HUNTER.md PHASE3_AGENT2_PARTNER_SCOUT.md PHASE4_AGENT3_EVENT_MAPPER.md PHASE5_DASHBOARD_NOTIFICATIONS.md  tasks.md
+PHASE2_AGENT1_TENDER_HUNTER.md PHASE3_AGENT2_PARTNER_SCOUT.md PHASE4_AGENT3_EVENT_MAPPER.md PHASE5_DASHBOARD_NOTIFICATIONS.md PHASE6_AGENTIC_UI_CHAT.md  tasks.md
 ```
 
 ---
@@ -174,6 +204,9 @@ guardrail-only (manual review) mode instead of guessing.
 
 # Scheduled monitoring (rescan every 60 min)
 .\.venv\Scripts\python.exe -m tender_hunter run --sources sample world_bank ebrd --interval 60
+
+# Keep only tenders published within the last 10 days
+.\.venv\Scripts\python.exe -m tender_hunter run --sources sample --days 10
 
 # List sources / cap the number of reports
 .\.venv\Scripts\python.exe -m tender_hunter sources
@@ -222,6 +255,9 @@ docker compose up searxng
 # Scoped to specific countries
 .\.venv\Scripts\python.exe -m event_mapper run --countries Morocco Senegal Egypt --limit 10
 
+# Only events starting within the next 30 days
+.\.venv\Scripts\python.exe -m event_mapper run --source sample --days 30
+
 # List event backends
 .\.venv\Scripts\python.exe -m event_mapper sources
 ```
@@ -245,6 +281,18 @@ Outputs (in `data/output/`):
 .\.venv\Scripts\python.exe -m notifications check --interval 60   # scheduled
 ```
 
+### Chat agent (Phase 6)
+
+```powershell
+# One-shot question (works offline via local fallback)
+.\.venv\Scripts\python.exe -m chat "Combien de partenaires qualifiés avons-nous ?"
+
+# Interactive chat loop
+.\.venv\Scripts\python.exe -m chat --interactive
+```
+
+The dashboard **Assist** tab offers the same assistant with a full chat UI.
+
 Configure channels in `.env`: `NOTIFY_SLACK_WEBHOOK`, `NOTIFY_TEAMS_WEBHOOK`,
 or `NOTIFY_SMTP_HOST`/`NOTIFY_SMTP_TO` (+ credentials) for the email digest.
 
@@ -263,14 +311,17 @@ docker compose --profile app up
 .\.venv\Scripts\python.exe tests\test_partner_scout.py   # Agent 2  (8 tests)
 .\.venv\Scripts\python.exe tests\test_event_mapper.py    # Agent 3  (7 tests)
 .\.venv\Scripts\python.exe tests\test_multilingual.py    # Phase 5  (6 tests, FR/EN/AR)
+.\.venv\Scripts\python.exe tests\test_control.py         # Phase 6  (4 tests, date filters + favorites)
+.\.venv\Scripts\python.exe tests\test_chat.py            # Phase 6  (5 tests, tool loop + fallback)
 ```
 
 All suites are pytest-free and assert against fakes (deterministic LLMs /
 embeddings), covering: similarity gate, verbatim evidence verification,
 hallucinated-quote suppression, invalid status, LLM-unavailable fallback, fit
 score / affinity score / lead score formulas, competitor disqualification,
-role classification, offline end-to-end pipeline runs for each agent, and
-multilingual (French / English / Arabic) end-to-end validation.
+role classification, offline end-to-end pipeline runs for each agent,
+multilingual (French / English / Arabic) end-to-end validation, date filters,
+the favorites store, and the chat tool-calling loop.
 
 ---
 
@@ -285,6 +336,8 @@ multilingual (French / English / Arabic) end-to-end validation.
 | `TARGET_COUNTRIES` | Morocco, Senegal, Tunisia, Egypt, Saudi Arabia, UAE | Agent 2 markets |
 | `AFFINITY_THRESHOLD` | `60` | min score to appear in `qualified_partners.json` |
 | `EVENT_SOURCE` | `sample` | Agent 3 backend (`sample` \| `ten_times` \| `eventbrite` \| `luma` \| `news`) |
+| `RECENT_DAYS` | `0` | Agent 1: keep only tenders published within the last N days |
+| `UPCOMING_DAYS` | `0` | Agent 3: keep only events starting within the next N days |
 | `PRIORITY_THRESHOLD` | `70` | min lead score to appear in `priority_leads.json` |
 | `TENDER_ALERT_THRESHOLD` | `80` | min tender score that fires a notification |
 | `NOTIFY_SLACK_WEBHOOK` | *(empty)* | Slack incoming webhook (alerts) |

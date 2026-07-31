@@ -46,6 +46,10 @@ EVENT_KEYWORDS = [
 MAX_EVENTS = int(_env("MAX_EVENTS", "20"))
 EVENT_FETCH_TIMEOUT = int(_env("EVENT_FETCH_TIMEOUT", "45"))
 
+# --- Date filters (0 = disabled) ---
+# Keep only events starting within the next N days (upcoming filter).
+UPCOMING_DAYS = int(_env("UPCOMING_DAYS", "0"))
+
 # --- Page scraping & NER (Task 4.2) ---
 MAX_PAGES_PER_EVENT = int(_env("MAX_PAGES_PER_EVENT", "6"))
 MIN_PAGE_TEXT_CHARS = int(_env("MIN_PAGE_TEXT_CHARS", "200"))

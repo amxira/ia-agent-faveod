@@ -107,3 +107,32 @@ Build a **100% sovereign, self-hosted Multi-Agent AI system** using **Chinese op
   - Test Agent 1 against real Arabic, French, and English tender documents.
   - Validate anti-hallucination rules (verify that missing criteria are marked correctly rather than guessed).
   - Fine-tune prompt parameters (temperature, max tokens, system prompts).
+
+---
+
+## 🎛️ PHASE 6: Agentic Control Center, AI Assistant & Full-Button UI
+*Goal: no more CLI commands - run everything from the dashboard with buttons, let the client drive the agents through a chat bot, and fill the remaining gaps from the blueprint.*
+
+- [x] **Task 6.1: Button-Based Control Center (no CLI)**
+  - Programmatic in-process runners for the 3 agents (`control/runner.py`).
+  - Saved-items / favorites store (`control/saved.py`, `data/saved.json`).
+  - Dashboard tabs: Control Center (run each agent with source/country/limit inputs), filters, favorites.
+
+- [x] **Task 6.2: Faveod Assist - Chat Agent (client-facing)**
+  - Tool-calling loop on the shared LLM client (`chat/assistant.py`).
+  - Tools: `dashboard_summary`, `search_tenders/partners/leads` (with country, score & date filters), `run_tender_hunter/partner_scout/event_mapper`, `save_item`.
+  - LLM-free local fallback when the model is rate-limited/unavailable (`chat/fallback.py`).
+  - Chat tab in the dashboard + `python -m chat` CLI / interactive mode.
+
+- [x] **Task 6.3: Date Filters for Search**
+  - `RECENT_DAYS` (tenders: published/deadline within last N days) applied in `tender_hunter` CLI, registry, dashboard & chat.
+  - `UPCOMING_DAYS` (events: starting within next N days) applied in `event_mapper` CLI, registry, dashboard & chat.
+
+- [ ] **Missing blueprint integrations (remaining, after Phase 6)**
+  - **Sovereign model serving (Deployment 1):** point `LLM_BASE_URL`/`EMBEDDING_PROVIDER` at a local vLLM/Ollama endpoint (`BGE-M3`, `Qwen-2.5`, `DeepSeek-R1`) so the whole stack runs without foreign APIs.
+  - **JavaScript-rendered portals:** Playwright/Puppeteer fetch for live tender/event sites that serve HTML via JS.
+  - **Residential proxy rotation:** replace the free proxy list with a rotating residential pool for geo-blocked portals.
+  - **Reasoning in EN, JSON in FR:** make the pipeline prompt for reasoning in English while emitting French/AR field labels in the output.
+  - **CRM push:** HubSpot/Salesforce connector to push qualified partners & priority leads.
+  - **Interactive event calendar:** calendar view (month grid) in the dashboard with drill-down to leads.
+  - **Scheduled auto-scans:** background scheduler so the Control Center can run agents on an interval without the CLI `--interval` flag.

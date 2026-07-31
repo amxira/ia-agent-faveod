@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from datetime import datetime, timedelta
 
 from tender_hunter import config
 from tender_hunter.ingest.afdb import AfDBSource
@@ -28,11 +29,42 @@ def _sample_tenders() -> list[Tender]:
     return [Tender.model_validate(raw) for raw in build_sample_tenders()]
 
 
+def _parse_date(value: str | None) -> datetime | None:
+    if not value:
+        return None
+    text = str(value).strip()[:19]
+    for fmt in ("%Y-%m-%dT%H:%M:%S", "%Y-%m-%d %H:%M:%S", "%Y-%m-%d"):
+        try:
+            return datetime.strptime(text, fmt)
+        except ValueError:
+            continue
+    return None
+
+
+def _recent(tenders: list[Tender], days: int) -> list[Tender]:
+    """Keep only tenders published (or with a deadline) within the last N days.
+
+    Tenders without a parseable date are dropped when the filter is active -
+    their recency cannot be verified.
+    """
+    if not days or days <= 0:
+        return tenders
+    cutoff = datetime.utcnow() - timedelta(days=days)
+    kept: list[Tender] = []
+    for tender in tenders:
+        date = _parse_date(tender.publication_date) or _parse_date(tender.deadline)
+        if date is not None and date >= cutoff:
+            kept.append(tender)
+    log.info("recent filter: %d -> %d tender(s) within last %d day(s)", len(tenders), len(kept), days)
+    return kept
+
+
 def fetch_all(source_names: list[str], proxy: ProxyProvider | None = None) -> list[Tender]:
     """Fetch tenders from the requested sources.
 
     Each adapter is best-effort and never raises. If no live source returns
     data, the sample dataset is added so the pipeline still runs end-to-end.
+    The configured RECENT_DAYS filter (0 = off) is applied before returning.
     """
     tenders: list[Tender] = []
     names = source_names or ["sample"]
@@ -60,4 +92,4 @@ def fetch_all(source_names: list[str], proxy: ProxyProvider | None = None) -> li
         log.warning("no tenders fetched from any source; seeding sample dataset")
         tenders = _sample_tenders()
 
-    return tenders
+    return _recent(tenders, config.RECENT_DAYS)

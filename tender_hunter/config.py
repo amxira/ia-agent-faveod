@@ -58,6 +58,10 @@ USER_AGENT = _env(
     "(KHTML, like Gecko) Chrome/120.0 Safari/537.36",
 )
 
+# --- Date filters (0 = disabled) ---
+# Keep only tenders published (or with a deadline) within the last N days.
+RECENT_DAYS = int(_env("RECENT_DAYS", "0"))
+
 # --- Data locations ---
 DATA_DIR = _env("DATA_DIR", "data")
 SAMPLE_DOCS_DIR = os.path.join(DATA_DIR, "sample_docs")

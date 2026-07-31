@@ -39,6 +39,8 @@ def _run(args: argparse.Namespace) -> int:
         config.EVENT_SOURCE = args.source
     if args.countries:
         config.EVENT_COUNTRIES = args.countries
+    if args.days and args.days > 0:
+        config.UPCOMING_DAYS = args.days
 
     if args.interval and args.interval > 0:
         while True:
@@ -86,6 +88,7 @@ def main(argv: list[str] | None = None) -> int:
     run_p = sub.add_parser("run", help="discover IT events, extract speakers, score leads")
     run_p.add_argument("--source", default=None, help="event backend (sample, ten_times, eventbrite, luma, news)")
     run_p.add_argument("--countries", nargs="+", default=None, help="target countries")
+    run_p.add_argument("--days", type=int, default=0, help="keep only events starting within the next N days (0 = all)")
     run_p.add_argument("--limit", type=int, default=0, help="max leads to emit (0 = all)")
     run_p.add_argument("--interval", type=float, default=0, help="rescan every N minutes (0 = once)")
     run_p.set_defaults(func=_run)
