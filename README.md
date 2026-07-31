@@ -2,8 +2,8 @@
 
 100% sovereign, self-hosted multi-agent AI system for Faveod's International
 Business Development: it finds **software tenders** (Agent 1), discovers local
-**IT partner companies** (Agent 2), and will later map **events & leads**
-(Agent 3) across Africa and the Middle East.
+**IT partner companies** (Agent 2), and maps **events & leads** (Agent 3) across
+Africa and the Middle East.
 
 Built with Python + LangGraph. No paid APIs in dev: free OpenRouter reasoning
 models, Google Gemini free-tier embeddings, self-hosted SearXNG, and an offline
@@ -48,9 +48,26 @@ Score (0–100%)**.
 
 Output: `QualifiedPartner` profiles in a partner directory.
 
+### Agent 3 — "Event Mapper & Lead Profiler" (`event_mapper/`) — Phase 4 ✅
+
+Maps regional IT conferences, extracts speaker / participant lists from event
+websites, and profiles high-value prospects (CIOs, CTOs, CISOs, IT Directors,
+Digital Transformation Ministers).
+
+Pipeline per event: **discover** (TenTimes / Eventbrite / Luma / news via
+SearXNG, or offline sample corpus) → **page fetch** (home + speakers/agenda/
+attendees) → **LLM NER with guardrails** (every extracted name must appear in the
+page corpus; role/title quotes must verify verbatim) → **deterministic
+classification** (decision-maker? seniority?) → **LLM key-challenges summary**
+(evidence-verified or honestly empty) → weighted **lead score (0–100%)** and
+priority bucket.
+
+Output: `ProspectCard` leads in `leads.jsonl` / `leads_latest.json` /
+`priority_leads.json`.
+
 ### Shared infrastructure
 
-Both agents reuse the same modules:
+All three agents reuse the same modules:
 
 - `tender_hunter/llm/client.py` — OpenAI-compatible client for
   OpenRouter. If the configured free model disappears (404), it auto-discovers a
@@ -84,11 +101,19 @@ partner_scout/                 # Agent 2 — Partner Scout (Phase 3)
 ├── qualify/                   # competitor filter + Faveod Affinity Score
 └── output/                    # partners.jsonl / partners_latest.json / qualified_partners.json
 
-tests/                         # test_guardrails.py, test_partner_scout.py (pytest-free)
+event_mapper/                  # Agent 3 — Event Mapper & Lead Profiler (Phase 4)
+├── config.py models.py state.py graph.py pipeline.py cli.py
+├── ingest/                    # ten_times, eventbrite, luma, news, sample corpus
+├── scrape/                    # event page fetcher + HTML text extraction
+├── ner/                       # LLM speaker NER + evidence guardrails
+├── leads/                     # decision-maker classifier + enrichment + scoring
+└── output/                    # events.jsonl / leads.jsonl / priority_leads.json
+
+tests/                         # test_guardrails.py, test_partner_scout.py, test_event_mapper.py (pytest-free)
 data/                          # sample_docs, downloads, output, logs
 docker/searxng/settings.yml    # SearXNG config (JSON API enabled)
 Dockerfile  docker-compose.yml  requirements.txt  .env.example
-PHASE2_AGENT1_TENDER_HUNTER.md PHASE3_AGENT2_PARTNER_SCOUT.md  tasks.md
+PHASE2_AGENT1_TENDER_HUNTER.md PHASE3_AGENT2_PARTNER_SCOUT.md PHASE4_AGENT3_EVENT_MAPPER.md  tasks.md
 ```
 
 ---
@@ -160,7 +185,31 @@ Outputs (in `data/output/`):
 - `qualified_partners.json` — only companies scoring ≥ `AFFINITY_THRESHOLD` (60)
   that are not disqualified competitors.
 
-### Everything in Docker (Qdrant + SearXNG + both agents)
+### Agent 3 — Event Mapper & Lead Profiler
+
+```powershell
+# Offline demo (sample events, zero network)
+.\.venv\Scripts\python.exe -m event_mapper run --source sample
+
+# Live event discovery (TenTimes / Eventbrite / Luma / news via SearXNG)
+.\.venv\Scripts\python.exe -m event_mapper run --source ten_times
+docker compose up searxng
+.\.venv\Scripts\python.exe -m event_mapper run --source news
+
+# Scoped to specific countries
+.\.venv\Scripts\python.exe -m event_mapper run --countries Morocco Senegal Egypt --limit 10
+
+# List event backends
+.\.venv\Scripts\python.exe -m event_mapper sources
+```
+
+Outputs (in `data/output/`):
+- `events.jsonl` / `events_latest.json` — discovered events.
+- `leads.jsonl` — full lead history.
+- `leads_latest.json` — last run, sorted by lead score.
+- `priority_leads.json` — only leads scoring ≥ `PRIORITY_THRESHOLD` (70).
+
+### Everything in Docker (Qdrant + SearXNG + all three agents)
 
 ```powershell
 docker compose --profile app up
@@ -173,13 +222,14 @@ docker compose --profile app up
 ```powershell
 .\.venv\Scripts\python.exe tests\test_guardrails.py      # Agent 1  (6 tests)
 .\.venv\Scripts\python.exe tests\test_partner_scout.py   # Agent 2  (8 tests)
+.\.venv\Scripts\python.exe tests\test_event_mapper.py    # Agent 3  (7 tests)
 ```
 
-Both suites are pytest-free and assert against fakes (deterministic LLMs /
+All suites are pytest-free and assert against fakes (deterministic LLMs /
 embeddings), covering: similarity gate, verbatim evidence verification,
 hallucinated-quote suppression, invalid status, LLM-unavailable fallback, fit
-score / affinity score formulas, competitor disqualification, and an offline
-end-to-end pipeline run.
+score / affinity score / lead score formulas, competitor disqualification,
+role classification, and offline end-to-end pipeline runs for each agent.
 
 ---
 
@@ -193,6 +243,8 @@ end-to-end pipeline run.
 | `SEARXNG_URL` | `http://localhost:8080` | self-hosted meta-search |
 | `TARGET_COUNTRIES` | Morocco, Senegal, Tunisia, Egypt, Saudi Arabia, UAE | Agent 2 markets |
 | `AFFINITY_THRESHOLD` | `60` | min score to appear in `qualified_partners.json` |
+| `EVENT_SOURCE` | `sample` | Agent 3 backend (`sample` \| `ten_times` \| `eventbrite` \| `luma` \| `news`) |
+| `PRIORITY_THRESHOLD` | `70` | min lead score to appear in `priority_leads.json` |
 | `QDRANT_URL` | *(empty)* | empty = in-memory vector store |
 
 ---

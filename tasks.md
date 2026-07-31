@@ -79,15 +79,15 @@ Build a **100% sovereign, self-hosted Multi-Agent AI system** using **Chinese op
 ## 📅 PHASE 4: Agent 3 — "Event Mapper & Lead Profiler"
 *Goal: Map regional IT conferences, extract attendee/speaker lists, and profile high-value prospects (CIOs, CTOs, Ministers).*
 
-- [ ] **Task 4.1: Event Scraper & Monitoring Engine**
+- [x] **Task 4.1: Event Scraper & Monitoring Engine**
   - Build automated monitors on event platforms (10times, Eventbrite, Luma) and regional IT news sites (TechCabal, ArabianBusiness).
   - Track keywords: `"IT Summit"`, `"Digital Transformation Africa"`, `"Cybersecurity Conference Dubai"`.
 
-- [ ] **Task 4.2: Participant & Speaker Extraction**
+- [x] **Task 4.2: Participant & Speaker Extraction**
   - Scrape public speaker panels and declared attendee lists from event websites.
   - Feed raw text into `Qwen-2.5` to perform Named Entity Recognition (NER) and extract Person Names, Job Titles, and Company Names.
 
-- [ ] **Task 4.3: Lead Enrichment & Prospect Cards**
+- [x] **Task 4.3: Lead Enrichment & Prospect Cards**
   - Cross-reference extracted names to identify decision-makers (CIOs, CTOs, IT Directors, Digital Transformation Ministers).
   - Use `Qwen-2.5` to generate a summary of each lead's key IT challenges based on their recent panel topics or public statements.
 

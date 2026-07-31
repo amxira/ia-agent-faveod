@@ -48,5 +48,18 @@ services:
     command: ["-m", "partner_scout", "run", "--source", "searxng"]
     restart: unless-stopped
 
+  event-mapper:
+    build: .
+    container_name: faveod-event-mapper
+    profiles: ["app"]
+    env_file: .env
+    environment:
+      EVENT_SOURCE: ${EVENT_SOURCE:-sample}
+    volumes:
+      - ./data:/app/data
+      - ./.env:/app/.env:ro
+    command: ["-m", "event_mapper", "run", "--source", "sample"]
+    restart: unless-stopped
+
 volumes:
   qdrant_data:
