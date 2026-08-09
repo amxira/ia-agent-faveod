@@ -61,17 +61,23 @@ services:
     command: ["-m", "event_mapper", "run", "--source", "sample"]
     restart: unless-stopped
 
-  dashboard:
+  api:
     build: .
-    container_name: faveod-dashboard
+    container_name: faveod-api
     profiles: ["app"]
     env_file: .env
+    environment:
+      QDRANT_URL: http://qdrant:6333
+      SEARXNG_URL: http://searxng:8080
     ports:
-      - "8501:8501"
+      - "8000:8000"
     volumes:
       - ./data:/app/data
       - ./.env:/app/.env:ro
-    command: ["-m", "streamlit", "run", "dashboard/app.py", "--server.address", "0.0.0.0", "--server.port", "8501", "--server.headless", "true"]
+    depends_on:
+      - qdrant
+      - searxng
+    command: ["-m", "api", "--host", "0.0.0.0", "--port", "8000"]
     restart: unless-stopped
 
   notifications:

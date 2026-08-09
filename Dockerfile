@@ -13,5 +13,8 @@ COPY partner_scout ./partner_scout
 COPY event_mapper ./event_mapper
 COPY dashboard ./dashboard
 COPY notifications ./notifications
+COPY control ./control
+COPY chat ./chat
+COPY api ./api
 
 ENTRYPOINT ["python"]

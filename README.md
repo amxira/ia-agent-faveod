@@ -67,15 +67,17 @@ Output: `ProspectCard` leads in `leads.jsonl` / `leads_latest.json` /
 
 ### Phase 5 — Dashboard & Notifications (`dashboard/`, `notifications/`) ✅
 
-- **Dashboard** (`streamlit run dashboard/app.py`) — a single web UI with three
-  tabs: **Tender Feed** (match scores, criteria & citations), **Partner
-  Directory** (qualified local ESNs), and **Events & Leads** (event calendar +
-  prioritized prospect list with challenges/topics). Reads the agents' latest
-  output files, no database needed.
+- **REST API** (`api/`) — the one and only backend. FastAPI exposes every agent
+  action and every feed with automatic Swagger docs at `http://localhost:8000/docs`
+  (ReDoc at `/redoc`). The future web frontend is specified in `FRONTEND.md`.
+  Run with `python -m api`.
+- **Legacy Streamlit dashboard** (`streamlit run dashboard/app.py`) — kept only
+  as a reference; it is being replaced by the REST API + new frontend.
 - **Notifications** (`python -m notifications check`) — detects *new*
   high-value tenders (≥ `TENDER_ALERT_THRESHOLD`, default 80%) and
   high-priority leads (deduplicated via a state file) and dispatches them to
-  **Slack**, **Teams**, and/or **SMTP email** (console always prints).
+  **Slack**, **Teams**, and/or **SMTP email** (console always prints). Also
+  exposed as `POST /api/notifications/check`.
 - **Multilingual validation** (`tests/test_multilingual.py`) — Agent 1 is tested
   against real French (PDF), English (PDF) and Arabic (DOCX) sample tender
   documents; anti-hallucination rules are verified to hold in every language.
@@ -83,7 +85,6 @@ Output: `ProspectCard` leads in `leads.jsonl` / `leads_latest.json` /
 ### Phase 6 — Control Center, AI Assistant & Full-Button UI (`control/`, `chat/`) ✅
 
 No more CLI commands to get results:
-
 - **Button-driven Control Center** — run each agent in-process from the
   dashboard with source / country / date / limit inputs (`control/runner.py`).
 - **Favorites** — bookmark tenders, partners and leads with one click
@@ -96,9 +97,21 @@ No more CLI commands to get results:
   (country / score / date), run the agents, and save favorites — all in French,
   English or Arabic. When the LLM is rate-limited or has no API key it falls
   back to local pattern-based answers so it still works offline.
-  - Dashboard tab: **Assist** (`streamlit run dashboard/app.py`).
+  - REST: `POST /api/chat` (stateful via `session_id`) for the frontend.
   - CLI: `python -m chat "Combien de partenaires qualifiés avons-nous ?"` or
     `python -m chat --interactive`.
+
+### Phase 7 — REST API (backend-only) ✅ & frontend spec 📄
+
+- **FastAPI backend** (`api/`) — the one and only backend. Every feed (tenders,
+  partners, events, leads), every agent run, favorites, notifications and the
+  chat assistant are JSON endpoints. Automatic **Swagger UI** at
+  `http://localhost:8000/docs`, **ReDoc** at `/redoc`, OpenAPI at
+  `/openapi.json`. Run with `python -m api`.
+- **Frontend specification** (`FRONTEND.md`) — the complete contract for the
+  future web UI: pages, components, API endpoints, filters, and acceptance
+  criteria. The frontend itself is **not built yet** — the spec is ready so it
+  can be done in a separate iteration.
 
 ### Shared infrastructure
 
@@ -144,9 +157,14 @@ event_mapper/                  # Agent 3 — Event Mapper & Lead Profiler (Phase
 ├── leads/                     # decision-maker classifier + enrichment + scoring
 └── output/                    # events.jsonl / leads.jsonl / priority_leads.json
 
-dashboard/                     # Phase 5 — Streamlit UI (tender feed / partners / events)
-├── data.py                    #   loads the agents' latest output files
-└── app.py                     #   Phase 6: run buttons, filters, favorites, chat tab
+dashboard/                     # Phase 5 — data loader used by the API & chat
+└── data.py                    #   reads the agents' latest output files
+
+api/                           # THE backend: FastAPI REST API (Phase 7)
+├── app.py                     #   all routes; Swagger at /docs (auto)
+├── schemas.py                 #   pydantic request bodies (OpenAPI types)
+├── sessions.py                #   in-memory chat session store
+└── __main__.py                #   `python -m api [--host --port --reload]`
 
 control/                       # Phase 6 — programmatic agent runs + favorites store
 ├── runner.py                  #   run_tenders / run_partners / run_events (in-process)
@@ -166,7 +184,7 @@ tests/                         # test_guardrails.py, test_partner_scout.py, test
 data/                          # sample_docs, downloads, output, logs, state
 docker/searxng/settings.yml    # SearXNG config (JSON API enabled)
 Dockerfile  docker-compose.yml  requirements.txt  .env.example
-PHASE2_AGENT1_TENDER_HUNTER.md PHASE3_AGENT2_PARTNER_SCOUT.md PHASE4_AGENT3_EVENT_MAPPER.md PHASE5_DASHBOARD_NOTIFICATIONS.md PHASE6_AGENTIC_UI_CHAT.md  tasks.md
+PHASE2_AGENT1_TENDER_HUNTER.md PHASE3_AGENT2_PARTNER_SCOUT.md PHASE4_AGENT3_EVENT_MAPPER.md PHASE5_DASHBOARD_NOTIFICATIONS.md PHASE6_AGENTIC_UI_CHAT.md  FRONTEND.md  tasks.md
 ```
 
 ---
@@ -268,13 +286,23 @@ Outputs (in `data/output/`):
 - `leads_latest.json` — last run, sorted by lead score.
 - `priority_leads.json` — only leads scoring ≥ `PRIORITY_THRESHOLD` (70).
 
-### Dashboard & Notifications (Phase 5)
+### REST API (the one and only backend)
 
 ```powershell
-# Dashboard (open http://localhost:8501)
-.\.venv\Scripts\python.exe -m streamlit run dashboard/app.py
+# Start the FastAPI backend (Swagger docs at http://localhost:8000/docs)
+.\.venv\Scripts\python.exe -m api
+.\.venv\Scripts\python.exe -m api --reload   # dev hot-reload
+.\.venv\Scripts\python.exe -m api --port 9000 --host 0.0.0.0
+```
 
-# Notifications: detect & dispatch new high-value tenders / high-priority leads
+Every feed, agent run, favorite and the chat are exposed as JSON endpoints —
+open `http://localhost:8000/docs` for the interactive Swagger UI, or
+`http://localhost:8000/redoc` for ReDoc. The frontend that consumes this API is
+specified in [`FRONTEND.md`](FRONTEND.md) (to be built).
+
+### Notifications (Phase 5)
+
+```powershell
 .\.venv\Scripts\python.exe -m notifications check
 .\.venv\Scripts\python.exe -m notifications check --dry-run   # print only
 .\.venv\Scripts\python.exe -m notifications check --reset     # re-alert after reset
@@ -291,15 +319,17 @@ Outputs (in `data/output/`):
 .\.venv\Scripts\python.exe -m chat --interactive
 ```
 
-The dashboard **Assist** tab offers the same assistant with a full chat UI.
+The same assistant is exposed over HTTP as `POST /api/chat` (stateful via
+`session_id`) for the future frontend.
 
 Configure channels in `.env`: `NOTIFY_SLACK_WEBHOOK`, `NOTIFY_TEAMS_WEBHOOK`,
 or `NOTIFY_SMTP_HOST`/`NOTIFY_SMTP_TO` (+ credentials) for the email digest.
 
-### Everything in Docker (Qdrant + SearXNG + all three agents + dashboard)
+### Everything in Docker (Qdrant + SearXNG + all agents + REST API)
 
 ```powershell
 docker compose --profile app up
+# API is then at http://localhost:8000/docs
 ```
 
 ---
@@ -313,6 +343,7 @@ docker compose --profile app up
 .\.venv\Scripts\python.exe tests\test_multilingual.py    # Phase 5  (6 tests, FR/EN/AR)
 .\.venv\Scripts\python.exe tests\test_control.py         # Phase 6  (4 tests, date filters + favorites)
 .\.venv\Scripts\python.exe tests\test_chat.py            # Phase 6  (5 tests, tool loop + fallback)
+.\.venv\Scripts\python.exe tests\test_api.py             # Phase 7  (8 tests, REST endpoints)
 ```
 
 All suites are pytest-free and assert against fakes (deterministic LLMs /
