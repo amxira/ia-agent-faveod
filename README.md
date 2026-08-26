@@ -101,17 +101,18 @@ No more CLI commands to get results:
   - CLI: `python -m chat "Combien de partenaires qualifiés avons-nous ?"` or
     `python -m chat --interactive`.
 
-### Phase 7 — REST API (backend-only) ✅ & frontend spec 📄
+### Phase 7 — REST API (backend-only) ✅ & React frontend ✅
 
 - **FastAPI backend** (`api/`) — the one and only backend. Every feed (tenders,
   partners, events, leads), every agent run, favorites, notifications and the
   chat assistant are JSON endpoints. Automatic **Swagger UI** at
   `http://localhost:8000/docs`, **ReDoc** at `/redoc`, OpenAPI at
   `/openapi.json`. Run with `python -m api`.
-- **Frontend specification** (`FRONTEND.md`) — the complete contract for the
-  future web UI: pages, components, API endpoints, filters, and acceptance
-  criteria. The frontend itself is **not built yet** — the spec is ready so it
-  can be done in a separate iteration.
+- **React frontend** (`frontend/`) — Vite + React + TypeScript + TanStack Query.
+  All pages (Overview, Control Center, feeds with filters & detail drawers,
+  favorites, Assist chat) are implemented and connected to the API. Dev server:
+  `cd frontend && npm run dev` → `http://localhost:5173` (proxies `/api` to the
+  backend, so no CORS setup needed). The full spec lives in `FRONTEND.md`.
 
 ### Shared infrastructure
 
@@ -165,6 +166,13 @@ api/                           # THE backend: FastAPI REST API (Phase 7)
 ├── schemas.py                 #   pydantic request bodies (OpenAPI types)
 ├── sessions.py                #   in-memory chat session store
 └── __main__.py                #   `python -m api [--host --port --reload]`
+
+frontend/                      # React + Vite + TS UI (Phase 7)
+├── src/api/client.ts          #   typed fetch wrapper (VITE_API_BASE, default /api)
+├── src/hooks.ts               #   TanStack Query hooks per endpoint
+├── src/components/            #   DataTable, DetailDrawer, badges, chat, layout…
+├── src/pages/                 #   Overview, Control, Tenders, Partners, Events, Saved, Assist
+└── vite.config.ts             #   dev proxy /api + /docs -> http://localhost:8000
 
 control/                       # Phase 6 — programmatic agent runs + favorites store
 ├── runner.py                  #   run_tenders / run_partners / run_events (in-process)
@@ -297,8 +305,16 @@ Outputs (in `data/output/`):
 
 Every feed, agent run, favorite and the chat are exposed as JSON endpoints —
 open `http://localhost:8000/docs` for the interactive Swagger UI, or
-`http://localhost:8000/redoc` for ReDoc. The frontend that consumes this API is
-specified in [`FRONTEND.md`](FRONTEND.md) (to be built).
+`http://localhost:8000/redoc` for ReDoc.
+
+### Frontend (React)
+
+```powershell
+cd frontend
+npm install          # first time only
+npm run dev          # http://localhost:5173 (proxies /api to the backend)
+npm run build        # production build in frontend/dist
+```
 
 ### Notifications (Phase 5)
 

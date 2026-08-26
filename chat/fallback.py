@@ -158,14 +158,48 @@ _PER_COUNTRY_HINTS = (
     "per country", "each country", "for each country", "all countries",
 )
 
+_GREETING_WORDS = (
+    "bonjour", "salut", "hello", "hi", "hey", "salam", "مرحبا", "أهلا",
+    "bonsoir", "good morning", "good evening", "good afternoon",
+    "coucou", "yo", "welcome", "bienvenue",
+)
+
+_THANKS_WORDS = (
+    "merci", "thanks", "thank you", "shukran", "شكرا",
+)
+
 
 def _wants_per_country(text: str) -> bool:
     return any(hint in text for hint in _PER_COUNTRY_HINTS)
 
 
+def _is_greeting(text: str) -> bool:
+    stripped = text.strip().rstrip(" !?.")
+    return stripped in _GREETING_WORDS or any(w in stripped.split() for w in _GREETING_WORDS)
+
+
+def _is_thanks(text: str) -> bool:
+    stripped = text.strip().rstrip(" !?.")
+    return stripped in _THANKS_WORDS or any(w in stripped.split() for w in _THANKS_WORDS)
+
+
 def local_answer(message: str, transcript: list | None = None) -> str:
     text = message.lower()
     per_country = _wants_per_country(text)
+
+    if _is_greeting(text):
+        return (
+            "Bonjour ! Je suis Faveod Assist, votre assistant d'intelligence "
+            "commerciale. Je peux vous aider à :\n\n"
+            "- **Résumer l'état** des agents (tenders, partenaires, leads)\n"
+            "- **Chercher** des appels d'offres, partenaires ou leads\n"
+            "- **Lancer** un agent (scan, collecte, actualisation)\n"
+            "- **Enregistrer** un résultat en favori\n\n"
+            "Posez-moi une question ou demandez-moi une action !"
+        )
+
+    if _is_thanks(text):
+        return "Avec plaisir ! N'hésitez pas si vous avez d'autres questions."
 
     if any(w in text for w in ("run", "lancer", "lance", "scanner", "scan", "scrape", "collecte", "refresh", "maj", "mise à jour", "actualise")):
         agent = _detect_agent(text)
@@ -187,4 +221,10 @@ def local_answer(message: str, transcript: list | None = None) -> str:
     if any(w in text for w in ("tender", "appel", "appels", "offre", "offres")):
         return _answer("search_tenders", {"per_country": per_country})
 
-    return _answer("help")
+    return (
+        "Je ne suis pas sûr de comprendre votre demande. Essayez par exemple :\n"
+        "- \"Résumé\" — état des agents\n"
+        "- \"Cherche les tenders au Maroc\" — recherche d'appels d'offres\n"
+        "- \"Lance le scan des partenaires\" — exécuter un agent\n"
+        "- \"Aide\" — voir toutes les commandes disponibles"
+    )

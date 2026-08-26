@@ -1,10 +1,29 @@
-# Faveod Intelligence — Frontend Specification
+# Faveod Intelligence — Frontend
 
-This document describes **everything the frontend must do**. It is the contract
-between the Python backend (FastAPI, `api/`) and the future UI.
+This document describes the frontend: what it does, the stack, and how to run
+it. It consumes the FastAPI backend (`api/`) documented live by Swagger at
+`http://localhost:8000/docs`.
 
-**Status: to be built.** The backend is already done and documented live by
-Swagger at `http://localhost:8000/docs`. Build the frontend against that API.
+**Status: built** — React + Vite + TypeScript app in `frontend/`. All pages
+below are implemented and connected to the backend.
+
+---
+
+## 0. Run it
+
+```powershell
+# 1. Backend (FastAPI, Swagger at http://localhost:8000/docs)
+.\.venv\Scripts\python.exe -m api
+
+# 2. Frontend dev server (http://localhost:5173, /api is proxied to :8000)
+cd frontend
+npm install      # first time only
+npm run dev
+
+# Production build (outputs frontend/dist)
+cd frontend
+npm run build
+```
 
 ---
 
@@ -25,24 +44,21 @@ REST API. There is no direct filesystem/DB access from the frontend.
 
 ---
 
-## 2. Recommended stack
+## 2. Stack
 
-Nothing is enforced — these are sensible defaults for a self-hosted internal
-tool:
+Chosen and used by the built app (`frontend/`):
 
-| Layer | Suggestion | Why |
-|-------|-----------|-----|
-| Framework | **React + Vite** (or Next.js) | large ecosystem, quick iteration |
-| Language | **TypeScript** | the API returns JSON; typed models prevent bugs |
-| UI kit | **Mantine** or **Ant Design** | tables, forms, drawers, notifications out of the box |
-| State | **TanStack Query** | caching + retry + background refetch for the API |
-| Routing | **React Router** (or Next.js pages) | pages listed in §4 |
-| Charts | **Recharts** (scores, calendars) | lightweight, React-friendly |
-| HTTP | native `fetch` or **axios** | thin typed client generated from OpenAPI |
+| Layer | Used | Notes |
+|-------|------|-------|
+| Framework | **React 18 + Vite 5** | dev server proxies `/api` and `/docs` to the backend |
+| Language | **TypeScript** (strict) | typed API models in `src/types.ts` |
+| UI kit | **Custom CSS** (`src/styles.css`) | no heavy component dependency |
+| State | **TanStack Query** | caching + auto-refetch after agent runs |
+| Routing | **React Router 6** | pages listed in §4 |
+| HTTP | **fetch** wrapper (`src/api/client.ts`) | base URL via `VITE_API_BASE` (default `/api`) |
 
-> Tip: FastAPI exposes the OpenAPI schema at `/openapi.json`. You can generate a
-> typed client with `openapi-typescript` or `@hey-api/openapi-ts` so the whole
-> API is auto-typed.
+> FastAPI exposes the OpenAPI schema at `/openapi.json` — a future step can
+> generate a fully typed client with `openapi-typescript` if desired.
 
 ---
 
@@ -200,18 +216,18 @@ Two views, one page:
 
 ## 6. Definitions of done / acceptance criteria
 
-The frontend is "done" when a user can, **without touching a terminal**:
-- [ ] See live counts and top results on the Overview.
-- [ ] Run all three agents with chosen options from the Control Center and read
+The frontend is **done** when a user can, **without touching a terminal**:
+- [x] See live counts and top results on the Overview.
+- [x] Run all three agents with chosen options from the Control Center and read
       the execution log.
-- [ ] Filter, sort, paginate and open details for tenders, partners, events and
+- [x] Filter, sort, paginate and open details for tenders, partners, events and
       leads; see criteria + verbatim citations for tenders.
-- [ ] Bookmark and unbookmark tenders / partners / leads; review them in
+- [x] Bookmark and unbookmark tenders / partners / leads; review them in
       Favorites.
-- [ ] Ask Faveod Assist questions in FR / EN / AR, see the tool calls it makes,
+- [x] Ask Faveod Assist questions in FR / EN / AR, see the tool calls it makes,
       and start a fresh conversation.
-- [ ] Run the notifications check and see which channels fired.
-- [ ] The whole app degrades gracefully when the API is down (error states, no
+- [x] Run the notifications check and see which channels fired.
+- [x] The whole app degrades gracefully when the API is down (error states, no
       crashes).
 
 ---
