@@ -1,10 +1,21 @@
 import { useEffect, useRef, useState } from 'react';
 import { useChat, useResetChat } from '../hooks';
 import type { ChatHistoryEntry } from '../types';
-import { Spinner } from '../components/ui';
 import Icon from '../components/Icon';
+import ChatMarkdown from '../components/ChatMarkdown';
+import { useVoiceInput, VOICE_LANGS, AUTO_LANG } from '../hooks/useVoiceInput';
+import type { VoiceStatus } from '../hooks/useVoiceInput';
 
 const SESSION_KEY = 'faveod-assist-session';
+
+const STATUS_LABEL: Record<VoiceStatus, string> = {
+  idle: 'Appuyez pour dicter',
+  starting: 'Démarrage du micro…',
+  listening: 'Écoute active — parlez…',
+  processing: 'Traitement de la voix…',
+  unsupported: 'Saisie vocale non supportée',
+  error: 'Erreur de reconnaissance',
+};
 
 function ToolCard({ entry }: { entry: ChatHistoryEntry }) {
   let payload: unknown;
@@ -56,7 +67,18 @@ export default function Assist() {
   const [sessionId, setSessionId] = useState<string | null>(() => localStorage.getItem(SESSION_KEY));
   const [history, setHistory] = useState<ChatHistoryEntry[]>([]);
   const [input, setInput] = useState('');
+  const inputRef = useRef<HTMLInputElement>(null);
   const logRef = useRef<HTMLDivElement>(null);
+  const voice = useVoiceInput({
+    onFinal: (text) => {
+      setInput((prev) => {
+        const next = (prev ? `${prev} ${text}` : text).replace(/\s+/g, ' ').trim();
+        return next;
+      });
+      // Keep the mic pressed listening; user reviews then taps send/enter.
+      setTimeout(() => inputRef.current?.focus(), 0);
+    },
+  });
 
   useEffect(() => {
     logRef.current?.scrollTo({ top: logRef.current.scrollHeight, behavior: 'smooth' });
@@ -65,7 +87,10 @@ export default function Assist() {
   const send = () => {
     const msg = input.trim();
     if (!msg || chat.isPending) return;
+    // If the mic is still listening, finalize it first.
+    if (voice.isListening) voice.stop();
     setInput('');
+    inputRef.current?.focus();
     chat.mutate(
       { message: msg, session_id: sessionId ?? undefined, max_steps: 5 },
       {
@@ -128,30 +153,107 @@ export default function Assist() {
             if (entry.role === 'tool') return <ToolCard key={i} entry={entry} />;
             return (
               <div key={i} className={`msg ${entry.role === 'user' ? 'user' : 'assistant'}`}>
-                {entry.content}
+                {entry.role === 'user' ? (
+                  <span>{entry.content}</span>
+                ) : (
+                  <ChatMarkdown content={entry.content} />
+                )}
               </div>
             );
           })}
           {chat.isPending && (
-            <div className="msg assistant">
-              <Spinner /> Faveod Assist analyse…
+            <div className="msg assistant pending">
+              <span className="typing">
+                <span className="typing-dot" />
+                <span className="typing-dot" />
+                <span className="typing-dot" />
+              </span>
             </div>
           )}
         </div>
 
         <div className="chat-input">
-          <input
-            type="text"
-            placeholder="Posez votre question (FR / EN / AR)…"
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && send()}
-            disabled={chat.isPending}
-          />
-          <button className="btn btn-primary" onClick={send} disabled={chat.isPending || !input.trim()}>
-            <Icon name="send" size={15} />
-            Envoyer
-          </button>
+          <div className="chat-input-row">
+            <input
+              ref={inputRef}
+              type="text"
+              placeholder="Posez votre question (FR / EN / AR)…"
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && send()}
+              disabled={chat.isPending}
+              autoComplete="off"
+            />
+            <button className="btn btn-primary" onClick={send} disabled={chat.isPending || !input.trim()}>
+              <Icon name="send" size={15} />
+              <span className="btn-label">Envoyer</span>
+            </button>
+          </div>
+
+          <div className="voice-toolbar">
+            <div className="voice-lang">
+              <Icon name="language" size={15} />
+              <select
+                className="voice-lang-select"
+                value={voice.lang}
+                onChange={(e) => voice.changeLang(e.target.value)}
+                disabled={voice.isListening || voice.status === 'starting'}
+                aria-label="Langue de dictée"
+              >
+                <option value={AUTO_LANG.code}>{AUTO_LANG.flag} {AUTO_LANG.label}</option>
+                {VOICE_LANGS.map((l) => (
+                  <option key={l.code} value={l.code}>
+                    {l.flag} {l.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <button
+              type="button"
+              className={`voice-btn ${voice.isListening || voice.status === 'starting' ? 'on' : ''}`}
+              onClick={voice.toggle}
+              disabled={!voice.supported}
+              aria-label={STATUS_LABEL[voice.status]}
+              title={STATUS_LABEL[voice.status]}
+            >
+              <span className="voice-btn-ring" />
+              <Icon name="mic" size={18} />
+              <span className="voice-status-dot" />
+            </button>
+
+            <span className={`voice-status ${voice.isListening || voice.status === 'starting' ? 'live' : ''}`}>
+              {voice.isListening || voice.status === 'starting' ? (
+                <span className="voice-live-label">
+                  <span className="live-ping" />
+                  {STATUS_LABEL[voice.status]}
+                </span>
+              ) : (
+                <span className="voice-idle-label">
+                  {voice.supported ? 'Dictée vocale disponible' : 'Dictée non supportée (utilisez Chrome/Edge)'}
+                </span>
+              )}
+            </span>
+          </div>
+
+          {voice.interim && voice.isListening && (
+            <div className="voice-transcript-live">
+              <Icon name="volume" size={14} />
+              <span>{voice.interim}</span>
+            </div>
+          )}
+
+          {voice.error && (
+            <div className="voice-error" role="alert">
+              <Icon name="warning" size={16} />
+              <span className="voice-error-msg">{voice.error.message}</span>
+              {voice.error.dismissible && (
+                <button className="voice-error-dismiss" onClick={voice.dismissError} aria-label="Fermer">
+                  <Icon name="x" size={14} />
+                </button>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </>

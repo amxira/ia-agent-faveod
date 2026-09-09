@@ -44,6 +44,7 @@ class ChatAssistant:
         transcript = self.history[-12:]
         seen_calls: set[tuple] = set()
         last_result: dict | None = None
+        has_tool_result = False  # True once at least one tool has been executed
 
         def finish(text: str) -> str:
             self.history.append({"role": "assistant", "content": text})
@@ -60,6 +61,12 @@ class ChatAssistant:
 
             tool = raw.get("tool")
             if isinstance(tool, str) and tool in TOOLS:
+                # If we already have a tool result and the model tries to call
+                # another tool instead of answering, force the formatted answer.
+                if has_tool_result and last_result is not None:
+                    log.info("model tried to call %r after tool result — forcing formatted answer", tool)
+                    return finish(_format_result(last_result))
+
                 arguments = raw.get("arguments") or {}
                 if not isinstance(arguments, dict):
                     arguments = {}
@@ -81,6 +88,7 @@ class ChatAssistant:
                     return finish(_format_result(result))
                 seen_calls.add(signature)
                 last_result = result
+                has_tool_result = True
                 continue
 
             return finish(local_answer(message, transcript))

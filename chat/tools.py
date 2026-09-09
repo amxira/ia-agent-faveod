@@ -12,6 +12,12 @@ from datetime import datetime, timedelta
 
 from dashboard import data as store
 from control import runner, saved
+from chat.external_tools import (
+    tool_list_tender_portals,
+    tool_search_external_tenders,
+    tool_search_esn_partners,
+    tool_tender_portals_summary,
+)
 
 log = logging.getLogger(__name__)
 
@@ -251,9 +257,11 @@ def tool_help():
         "message": (
             "Je peux : résumer l'état des agents ; chercher des appels d'offres "
             "(tenders), partenaires et leads avec filtres (pays, score, date) ; "
-            "lancer un agent (ex. scanner les appels d'offres récents) ; et "
-            "enregistrer un résultat dans les favoris. Répondez-moi en "
-            "français, anglais ou arabe."
+            "lancer un agent (ex. scanner les appels d'offres récents) ; "
+            "enregistrer un résultat dans les favoris ; "
+            "ET rechercher des appels d'offres et des partenaires ESN en "
+            "Afrique et au Moyen-Orient sur des portails externes. "
+            "Répondez-moi en français, anglais ou arabe."
         ),
         "tools": [
             "dashboard_summary",
@@ -265,6 +273,11 @@ def tool_help():
             "run_partner_scout(source, countries, limit)",
             "run_event_mapper(source, upcoming_days, limit)",
             "save_item(kind, item_id)",
+            "--- EXTERNAL SEARCH (Afrique & Moyen-Orient) ---",
+            "search_external_tenders(query, zone, limit)",
+            "search_esn_partners(country, expertise, groupable_only)",
+            "list_tender_portals()",
+            "tender_portals_summary()",
         ],
     }
 
@@ -279,5 +292,9 @@ TOOLS: dict[str, callable] = {
     "run_partner_scout": tool_run_partner_scout,
     "run_event_mapper": tool_run_event_mapper,
     "save_item": tool_save_item,
+    "search_external_tenders": tool_search_external_tenders,
+    "search_esn_partners": tool_search_esn_partners,
+    "list_tender_portals": tool_list_tender_portals,
+    "tender_portals_summary": tool_tender_portals_summary,
     "help": tool_help,
 }

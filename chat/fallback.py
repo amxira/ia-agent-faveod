@@ -46,6 +46,12 @@ def _format_result(result) -> str:
         if not items:
             return "Aucun résultat trouvé pour cette recherche."
         return _format_items_table(items, result.get("count", len(items)), grouped=bool(result.get("grouped")))
+    if "results" in result and "query" in result:
+        return _format_external_tenders(result)
+    if "items" in result and "country" in result and "count" in result and isinstance(result.get("items"), list):
+        first = result["items"][0] if result["items"] else {}
+        if "name" in first and "countries" in first:
+            return _format_esn_partners(result)
     if "tenders" in result or "leads" in result or "qualified_partners" in result:
         return _format_summary(result)
     if "already_saved" in result:
@@ -55,6 +61,68 @@ def _format_result(result) -> str:
     if result.get("ok") is False:
         return f"Erreur : {result.get('reason', 'inconnue')}"
     return str(result)
+
+
+def _format_external_tenders(data: dict) -> str:
+    """Format external tender search results into a readable answer."""
+    results = data.get("results", [])
+    query = data.get("query", "")
+    zone = data.get("zone", "")
+    total = data.get("total", len(results))
+    portals = data.get("portals_searched", 0)
+
+    if not results:
+        zone_txt = f" en {zone}" if zone else ""
+        return f"Aucun appel d'offres trouvé pour « {query} »{zone_txt} sur les portails surveillés."
+
+    zone_txt = f" en {zone}" if zone else ""
+    lines = [f"**{total} appel(s) d'offres trouvé(s)** pour « {query } »{zone_txt} (portail(s) : {portals}) :", ""]
+    for i, r in enumerate(results[:10], 1):
+        title = r.get("title", "Sans titre")
+        portal = r.get("portal", "")
+        url = r.get("url", "")
+        portal_url = r.get("portal_url", "")
+        link = url if url else portal_url
+        if link:
+            lines.append(f"{i}. **{title}** — [{portal}]({link})")
+        else:
+            lines.append(f"{i}. **{title}** — {portal}")
+    if total > 10:
+        lines.append(f"\n_(+{total - 10} autres résultats)_")
+    return "\n".join(lines)
+
+
+def _format_esn_partners(data: dict) -> str:
+    """Format ESN partner search results into a readable answer."""
+    items = data.get("items", [])
+    country = data.get("country", "")
+    expertise = data.get("expertise", "")
+    total = data.get("count", len(items))
+
+    if not items:
+        return f"Aucun partenaire ESN trouvé" + (f" en {country}" if country and country != "Tous" else "") + (f" pour {expertise}" if expertise and expertise != "Toutes" else "") + "."
+
+    zone_txt = f" en {country}" if country and country != "Tous" else ""
+    lines = [f"**{total} partenaire(s) ESN trouvé(s)**{zone_txt} :", ""]
+    for i, p in enumerate(items[:8], 1):
+        name = p.get("name", "")
+        pays = ", ".join(p.get("countries", []))
+        expertise_list = ", ".join(p.get("expertise", []))
+        url = p.get("website", "")
+        desc = p.get("description", "")
+        groupable = p.get("groupable", False)
+        qual = " — *groupable*" if groupable else ""
+        if url:
+            lines.append(f"{i}. **{name}** ({pays}) — [{url}]({url}){qual}")
+        else:
+            lines.append(f"{i}. **{name}** ({pays}){qual}")
+        if expertise_list:
+            lines.append(f"   Expertise : {expertise_list}")
+        if desc:
+            lines.append(f"   {desc}")
+    if total > 8:
+        lines.append(f"\n_(+{total - 8} autres)_")
+    return "\n".join(lines)
 
 
 def _format_items_table(items: list[dict], count: int, grouped: bool = False) -> str:
@@ -91,6 +159,15 @@ def _format_items_table(items: list[dict], count: int, grouped: bool = False) ->
                 f"{item.get('company')} | {item.get('country')} | {item.get('lead_score')}% | "
                 f"{item.get('priority')} |"
             )
+    elif "name" in first and "zones" in first and "sectors" in first:
+        lines.append("| Portail | URL | Zones | Secteurs | Gratuit |")
+        lines.append("|---|---|---|---|---|")
+        for item in items[:12]:
+            url = item.get("url", "")
+            zones = ", ".join(item.get("zones", []))
+            sectors = ", ".join(item.get("sectors", []))
+            free = "Oui" if item.get("free") else "Non"
+            lines.append(f"| **{item.get('name')}** | [{url}]({url}) | {zones} | {sectors} | {free} |")
     elif "id" in first and "name" in first:
         lines.append("| ID | Événement | Ville | Pays | Début | Leads |")
         lines.append("|---|---|---|---|---|---|")
@@ -99,6 +176,11 @@ def _format_items_table(items: list[dict], count: int, grouped: bool = False) ->
                 f"| `{item.get('id')}` | {item.get('name')} | {item.get('city')} | {item.get('country')} | "
                 f"{item.get('start_date')} | {item.get('lead_count', 0)} |"
             )
+    elif "name" in first and "countries" in first:
+        for item in items[:8]:
+            pays = ", ".join(item.get("countries", []))
+            exp = ", ".join(item.get("expertise", []))
+            lines.append(f"- **{item.get('name')}** ({pays}) — {exp}")
     else:
         return str(items[:8])
 
@@ -183,6 +265,43 @@ def _is_thanks(text: str) -> bool:
     return stripped in _THANKS_WORDS or any(w in stripped.split() for w in _THANKS_WORDS)
 
 
+_EXTERNAL_KEYWORDS = (
+    "externe", "external", "en ligne", "online", "internet", "web",
+    "portail", "portal", "afrique", "africa", "moyen-orient", "middle east",
+    "cameroun", "senegal", "sénégal", "tunisie", "tunisia", "maroc", "morocco",
+    "egypte", "egypt", "arabie", "saudi", "uae", "qatar",
+    "groupement", "grouping", "alliance", "partenariat",
+    "bad", "banque mondiale", "world bank",
+)
+
+
+def _is_external_search(text: str) -> bool:
+    return any(w in text for w in _EXTERNAL_KEYWORDS)
+
+
+def _detect_zone(text: str) -> str:
+    text_lower = text.lower()
+    if "cameroun" in text_lower or "cameroon" in text_lower:
+        return "cameroun"
+    if "sénégal" in text_lower or "senegal" in text_lower:
+        return "senegal"
+    if "tunisie" in text_lower or "tunisia" in text_lower:
+        return "tunisie"
+    if "maroc" in text_lower or "morocco" in text_lower:
+        return "maroc"
+    if "égypte" in text_lower or "egypt" in text_lower:
+        return "egypte"
+    if "arabie" in text_lower or "saudi" in text_lower:
+        return "arabie-saoudite"
+    if "uae" in text_lower or "dubaï" in text_lower or "dubai" in text_lower:
+        return "uae"
+    if "moyen-orient" in text_lower or "middle east" in text_lower:
+        return "moyen-orient"
+    if "afrique" in text_lower or "africa" in text_lower:
+        return "afrique"
+    return ""
+
+
 def local_answer(message: str, transcript: list | None = None) -> str:
     text = message.lower()
     per_country = _wants_per_country(text)
@@ -194,12 +313,35 @@ def local_answer(message: str, transcript: list | None = None) -> str:
             "- **Résumer l'état** des agents (tenders, partenaires, leads)\n"
             "- **Chercher** des appels d'offres, partenaires ou leads\n"
             "- **Lancer** un agent (scan, collecte, actualisation)\n"
-            "- **Enregistrer** un résultat en favori\n\n"
+            "- **Enregistrer** un résultat en favori\n"
+            "- **Rechercher des AO externes** en Afrique & Moyen-Orient\n"
+            "- **Trouver des partenaires ESN** pour groupement\n\n"
             "Posez-moi une question ou demandez-moi une action !"
         )
 
     if _is_thanks(text):
         return "Avec plaisir ! N'hésitez pas si vous avez d'autres questions."
+
+    if any(w in text for w in ("portail", "portal", "veille", "monitoring")):
+        return _answer("list_tender_portals")
+
+    if any(w in text for w in ("groupement", "grouping", "alliance", "partenariat", "esn", "partenaire externe")):
+        expertise = ""
+        if any(w in text for w in ("erp", "dynamics", "microsoft")):
+            expertise = "ERP"
+        elif any(w in text for w in ("cyber", "sécurité", "security")):
+            expertise = "cybersécurité"
+        elif any(w in text for w in ("ia", "ai", "intelligence artificielle")):
+            expertise = "IA"
+        elif any(w in text for w in ("mobile", "app", "application")):
+            expertise = "mobile"
+        elif any(w in text for w in ("cloud", "devops")):
+            expertise = "cloud"
+        return _answer("search_esn_partners", {"country": _detect_zone(text), "expertise": expertise, "groupable_only": True})
+
+    if _is_external_search(text):
+        query = " ".join(w for w in text.split() if len(w) > 3)
+        return _answer("search_external_tenders", {"query": query, "zone": _detect_zone(text), "limit": 8})
 
     if any(w in text for w in ("run", "lancer", "lance", "scanner", "scan", "scrape", "collecte", "refresh", "maj", "mise à jour", "actualise")):
         agent = _detect_agent(text)
@@ -224,7 +366,10 @@ def local_answer(message: str, transcript: list | None = None) -> str:
     return (
         "Je ne suis pas sûr de comprendre votre demande. Essayez par exemple :\n"
         "- \"Résumé\" — état des agents\n"
-        "- \"Cherche les tenders au Maroc\" — recherche d'appels d'offres\n"
+        "- \"Cherche les tenders au Maroc\" — recherche locale\n"
+        "- \"AO logiciel Cameroun\" — recherche externe Afrique\n"
+        "- \"Partenaires ESN Sénégal\" — trouver des partenaires\n"
+        "- \"Portails de veille\" — lister les portails AO\n"
         "- \"Lance le scan des partenaires\" — exécuter un agent\n"
         "- \"Aide\" — voir toutes les commandes disponibles"
     )
